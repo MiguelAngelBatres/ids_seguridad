@@ -1,11 +1,20 @@
-version: '3.9'
-
 services:
   ids:
     build: .
     container_name: ids_seguridad
     restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PORT: 5000
+      SCAPY_ENABLE: ${SCAPY_ENABLE:-0}
+      SCAPY_IFACE: ${SCAPY_IFACE:-}
+      SCAPY_BPF: ${SCAPY_BPF:-}
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    network_mode: host
     volumes:
-      - ./app:/app
+      - ./data:/app/data
     working_dir: /app
-    command: python main.py

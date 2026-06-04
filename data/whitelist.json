@@ -1,0 +1,26 @@
+[
+  {
+    "key": "auto-1780498526",
+    "ip": "10.13.140.32",
+    "mac": "c4:d0:e3:70:6d:40",
+    "note": "Host local"
+  },
+  {
+    "key": "10.13.144.32--1780498900",
+    "ip": "10.13.144.32",
+    "mac": null,
+    "note": "Mi computadora"
+  },
+    {
+    "key": "192.168.1.39--1780498900",
+    "ip": "192.168.1.39",
+    "mac": null,
+    "note": "Mi computadora en la casa"
+  },
+  {
+  "key": "192.168.1.1--1780550197",
+  "ip": "192.168.1.1",
+  "mac": null,
+  "note": "Router/gateway de la casa"
+}
+]

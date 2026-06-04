@@ -1,4 +1,3 @@
-scapy
+Flask
 python-dotenv
-requests
-python-whois
+scapy

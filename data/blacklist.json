@@ -1,0 +1,12 @@
+[
+  {
+    "ip": "203.0.113.66",
+    "host": "malicious.example",
+    "risk": "Virus/Botnet",
+    "note": "Entrada de ejemplo"
+  },
+  {
+    "ip": "10.14.60.199",
+    "risk": "Prueba"
+  }
+]

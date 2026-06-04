@@ -1,0 +1,37 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Lista Blanca</title>
+  </head>
+  <body>
+    <h1>Lista Blanca</h1>
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <ul>
+          {% for message in messages %}
+            <li>{{ message }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+    <form method="post">
+      IP: <input name="ip"><br>
+      MAC: <input name="mac"><br>
+      Nota: <input name="note"><br>
+      <button type="submit">Agregar</button>
+    </form>
+    <h2>Entradas</h2>
+    <ul>
+    {% for e in entries %}
+      <li>{{ e.ip }} - {{ e.mac }} - {{ e.note }}
+        <form method="post" action="/whitelist/remove" style="display:inline">
+          <input type="hidden" name="key" value="{{ e.key }}">
+          <button>Eliminar</button>
+        </form>
+      </li>
+    {% endfor %}
+    </ul>
+    <p><a href="/">Volver</a></p>
+  </body>
+</html>
