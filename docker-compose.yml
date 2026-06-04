@@ -14,7 +14,8 @@ services:
     cap_add:
       - NET_ADMIN
       - NET_RAW
-    network_mode: host
+    ports:
+      - "5000:5000"
     volumes:
       - ./data:/app/data
     working_dir: /app

@@ -83,7 +83,11 @@ Nota: `use_reloader=False` está configurado para que Flask no arranque dos moni
 docker compose up --build
 ```
 
-El servicio usa `network_mode: host`, monta `./data:/app/data` y agrega capacidades de red para captura real. Para probar sin captura, deja `SCAPY_ENABLE=0`.
+El servicio expone el puerto `5000` en el host, monta `./data:/app/data` y agrega capacidades de red para captura real.
+
+En Docker Desktop en Windows, `network_mode: host` no es compatible, por lo que la aplicación debe accederse en `http://localhost:5000`.
+
+Para probar sin captura, deja `SCAPY_ENABLE=0`.
 
 ## Endpoints
 
