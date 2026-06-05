@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from flask import Flask, flash, jsonify, redirect, render_template, request, url_for
+from flask import Flask, flash, jsonify, redirect, render_template, request, send_from_directory, url_for
 
 load_dotenv()
 
@@ -27,6 +27,11 @@ def index():
     alerts = get_alerts()
     whitelist = get_whitelist()
     return render_template('index.html', reports=reports, alerts=alerts, whitelist=whitelist)
+
+
+@app.route('/style.css')
+def legacy_style():
+    return send_from_directory(app.static_folder, 'style.css')
 
 
 @app.route('/whitelist', methods=['GET', 'POST'])

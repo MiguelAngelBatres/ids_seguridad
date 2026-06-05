@@ -3,35 +3,19 @@
   <head>
     <meta charset="utf-8">
     <title>IDS - Panel</title>
-    <style>
-      body { font-family: system-ui, sans-serif; margin: 1.5rem; max-width: 1100px; }
-      h1, h2 { color: #1a365d; }
-      table { border-collapse: collapse; width: 100%; margin-bottom: 1rem; font-size: 0.9rem; }
-      th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
-      th { background: #f0f4f8; position: sticky; top: 0; }
-      .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; color: #fff; }
-      .b-threat { background: #c53030; }
-      .b-heur { background: #d97706; }
-      .b-arp { background: #7c3aed; }
-      details { font-size: 0.8rem; color: #555; }
-      .table-wrap { max-height: 60vh; overflow-y: auto; border: 1px solid #ddd; }
-      .filter-row th { background: #fafbfc; position: sticky; top: 38px; padding: 4px 6px; }
-      .filter-row input { width: 100%; box-sizing: border-box; font-size: 0.8rem; padding: 3px 5px; }
-      .header-bar { display: flex; align-items: center; justify-content: space-between; margin-top: 1.5rem; gap: 1rem; flex-wrap: wrap; }
-      .header-bar h2 { margin: 0; }
-      .header-right { display: flex; align-items: center; gap: 0.75rem; }
-      .clear-btn { background: #c53030; color: #fff; border: 0; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
-      .clear-btn:hover { background: #9b2424; }
-      .live { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; color: #4a5568; }
-      .live .dot { width: 8px; height: 8px; border-radius: 50%; background: #38a169; animation: pulse 2s infinite; }
-      .live.off .dot { background: #c53030; animation: none; }
-      .live .ts { color: #888; }
-      @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.35; } 100% { opacity: 1; } }
-    </style>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&display=swap" rel="stylesheet">
   </head>
   <body>
-    <h1>IDS - Panel</h1>
-    <p><a href="/whitelist">Lista Blanca</a> | <a href="/reports">Reportes</a></p>
+    <div class="title">
+      <h1>IDS - Panel</h1>
+    </div>
+    <h2>
+      <a class="a-style" href="/whitelist">Lista Blanca</a> 
+      <a class="a-style" href="/reports">Reportes</a>
+    </h2>
     {% with messages = get_flashed_messages() %}
       {% if messages %}
         <ul>
@@ -41,7 +25,7 @@
     {% endwith %}
 
     <div class="header-bar">
-      <h2>Alertas recientes</h2>
+      <!-- <a class="title-table">Alertas recientes</a> -->
       <div class="header-right">
         <span class="live" id="live-alerts"><span class="dot"></span><span>En vivo</span><span class="ts" id="live-alerts-ts"></span></span>
         {% if alerts %}
@@ -56,6 +40,11 @@
     <div class="table-wrap">
       <table id="alerts-table">
         <thead>
+          <tr>
+            <th colspan="7" class="table-title">
+              Alertas Detectadas por el IDS
+            </th>
+          </tr>
           <tr>
             <th>Hora</th><th>Tipo</th><th>Origen</th><th>Destino</th><th>Protocolo</th><th>Riesgo</th><th>Evidencia</th>
           </tr>
