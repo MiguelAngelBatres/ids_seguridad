@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <title>IDS - Panel</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&display=swap" rel="stylesheet">
@@ -45,8 +45,14 @@
               Alertas Detectadas por el IDS
             </th>
           </tr>
-          <tr>
-            <th>Hora</th><th>Tipo</th><th>Origen</th><th>Destino</th><th>Protocolo</th><th>Riesgo</th><th>Evidencia</th>
+          <tr class="titles_tabla">
+            <th>Hora</th>
+            <th>Tipo</th>
+            <th>Origen</th>
+            <th>Destino</th>
+            <th>Protocolo</th>
+            <th>Riesgo</th>
+            <th>Evidencia</th>
           </tr>
           <tr class="filter-row">
             <th><input data-filter></th>
