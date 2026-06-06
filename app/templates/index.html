@@ -1,223 +1,26 @@
 <!doctype html>
-<html>
+<html lang="es">
   <head>
-    <meta charset="utf-8">
-    <title>IDS - Panel</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&display=swap" rel="stylesheet">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IDS Console</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='scripts/theme.css') }}" />
   </head>
   <body>
-    <div class="title">
-      <h1>IDS - Panel</h1>
-    </div>
-    <h2>
-      <a class="a-style" href="/whitelist">Lista Blanca</a> 
-      <a class="a-style" href="/reports">Reportes</a>
-    </h2>
-    {% with messages = get_flashed_messages() %}
-      {% if messages %}
-        <ul>
-          {% for message in messages %}<li>{{ message }}</li>{% endfor %}
-        </ul>
-      {% endif %}
-    {% endwith %}
+    <div id="root"></div>
 
-    <div class="header-bar">
-      <!-- <a class="title-table">Alertas recientes</a> -->
-      <div class="header-right">
-        <span class="live" id="live-alerts"><span class="dot"></span><span>En vivo</span><span class="ts" id="live-alerts-ts"></span></span>
-        {% if alerts %}
-        <form method="post" action="/alerts/clear" onsubmit="return confirm('¿Limpiar toda la lista de alertas?');" style="margin:0;">
-          <button type="submit" class="clear-btn">Limpiar lista de alertas</button>
-        </form>
-        {% endif %}
-      </div>
-    </div>
+    <!-- 1. React first -->
+    <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
 
-    {% if alerts %}
-    <div class="table-wrap">
-      <table id="alerts-table">
-        <thead>
-          <tr>
-            <th colspan="7" class="table-title">
-              Alertas Detectadas por el IDS
-            </th>
-          </tr>
-          <tr class="titles_tabla">
-            <th>Hora</th>
-            <th>Tipo</th>
-            <th>Origen</th>
-            <th>Destino</th>
-            <th>Protocolo</th>
-            <th>Riesgo</th>
-            <th>Evidencia</th>
-          </tr>
-          <tr class="filter-row">
-            <th><input data-filter></th>
-            <th><input data-filter></th>
-            <th><input data-filter></th>
-            <th><input data-filter></th>
-            <th><input data-filter></th>
-            <th><input data-filter></th>
-            <th><input data-filter></th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for a in alerts|reverse %}
-          <tr data-row data-ts="{{ a.timestamp }}">
-            <td>{{ a.timestamp }}</td>
-            <td>
-              {% if a.type == 'threat_intel' %}<span class="badge b-threat">threat_intel</span>
-              {% elif a.type == 'arp_spoof' %}<span class="badge b-arp">arp_spoof</span>
-              {% elif a.type == 'heuristic' %}<span class="badge b-heur">{{ a.subtype or 'heuristic' }}</span>
-              {% else %}{{ a.type }}{% endif %}
-            </td>
-            <td>{{ a.src_ip or 'N/D' }}<br><small>{{ a.src_mac or '' }}</small></td>
-            <td>{{ a.dst or 'N/D' }}{% if a.dst_port %}:{{ a.dst_port }}{% endif %}<br><small>{{ a.domain or '' }}</small></td>
-            <td>{{ a.protocol or '' }}</td>
-            <td>{{ a.risk }}</td>
-            <td>
-              {% if a.evidence %}<details><summary>ver</summary><pre>{{ a.evidence | tojson(indent=2) }}</pre></details>{% endif %}
-              {% if a.type == 'arp_spoof' %}<small>esperada {{ a.expected_mac }} / observada {{ a.actual_mac }}</small>{% endif %}
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% else %}
-    <p><em>Sin alertas registradas.</em> <span class="live" id="live-alerts"><span class="dot"></span><span>En vivo</span><span class="ts" id="live-alerts-ts"></span></span></p>
-    {% endif %}
-
-    <script>
-      (function () {
-        const table = document.getElementById('alerts-table');
-        const live = document.getElementById('live-alerts');
-        const liveTs = document.getElementById('live-alerts-ts');
-        const tbody = table ? table.querySelector('tbody') : null;
-        const inputs = table ? table.querySelectorAll('input[data-filter]') : [];
-
-        function applyFilters() {
-          if (!tbody) return;
-          const filters = Array.from(inputs).map(i => i.value.trim().toLowerCase());
-          const rows = tbody.querySelectorAll('tr[data-row]');
-          rows.forEach(row => {
-            const cells = row.querySelectorAll('td');
-            let show = true;
-            for (let i = 0; i < filters.length; i++) {
-              if (!filters[i]) continue;
-              const cell = cells[i];
-              if (!cell || cell.textContent.toLowerCase().indexOf(filters[i]) === -1) {
-                show = false;
-                break;
-              }
-            }
-            row.style.display = show ? '' : 'none';
-          });
-        }
-
-        inputs.forEach(input => input.addEventListener('input', applyFilters));
-
-        function makeBadge(type, subtype) {
-          const s = document.createElement('span');
-          s.className = 'badge';
-          if (type === 'threat_intel') { s.classList.add('b-threat'); s.textContent = 'threat_intel'; }
-          else if (type === 'arp_spoof') { s.classList.add('b-arp'); s.textContent = 'arp_spoof'; }
-          else if (type === 'heuristic') { s.classList.add('b-heur'); s.textContent = subtype || 'heuristic'; }
-          else { s.textContent = type || ''; }
-          return s;
-        }
-
-        function buildRow(a) {
-          const tr = document.createElement('tr');
-          tr.setAttribute('data-row', '');
-          tr.dataset.ts = a.timestamp || '';
-
-          const tdT = document.createElement('td');
-          tdT.textContent = a.timestamp || '';
-          tr.appendChild(tdT);
-
-          const tdType = document.createElement('td');
-          tdType.appendChild(makeBadge(a.type, a.subtype));
-          tr.appendChild(tdType);
-
-          const tdSrc = document.createElement('td');
-          tdSrc.appendChild(document.createTextNode(a.src_ip || 'N/D'));
-          tdSrc.appendChild(document.createElement('br'));
-          const sm = document.createElement('small');
-          sm.textContent = a.src_mac || '';
-          tdSrc.appendChild(sm);
-          tr.appendChild(tdSrc);
-
-          const tdDst = document.createElement('td');
-          tdDst.appendChild(document.createTextNode((a.dst || 'N/D') + (a.dst_port ? ':' + a.dst_port : '')));
-          tdDst.appendChild(document.createElement('br'));
-          const sd = document.createElement('small');
-          sd.textContent = a.domain || '';
-          tdDst.appendChild(sd);
-          tr.appendChild(tdDst);
-
-          const tdProto = document.createElement('td');
-          tdProto.textContent = a.protocol || '';
-          tr.appendChild(tdProto);
-
-          const tdRisk = document.createElement('td');
-          tdRisk.textContent = a.risk || '';
-          tr.appendChild(tdRisk);
-
-          const tdEv = document.createElement('td');
-          if (a.evidence) {
-            const det = document.createElement('details');
-            const sum = document.createElement('summary'); sum.textContent = 'ver';
-            det.appendChild(sum);
-            const pre = document.createElement('pre');
-            pre.textContent = JSON.stringify(a.evidence, null, 2);
-            det.appendChild(pre);
-            tdEv.appendChild(det);
-          }
-          if (a.type === 'arp_spoof') {
-            const sm2 = document.createElement('small');
-            sm2.textContent = `esperada ${a.expected_mac} / observada ${a.actual_mac}`;
-            tdEv.appendChild(sm2);
-          }
-          tr.appendChild(tdEv);
-          return tr;
-        }
-
-        let lastTs = 0;
-        if (tbody) {
-          const first = tbody.querySelector('tr[data-row]');
-          if (first) lastTs = parseInt(first.dataset.ts, 10) || 0;
-        }
-
-        let inFlight = false;
-        function poll() {
-          if (inFlight) return;
-          inFlight = true;
-          fetch(`/api/alerts?since=${lastTs}`, { cache: 'no-store' })
-            .then(r => r.json())
-            .then(data => {
-              if (live) live.classList.remove('off');
-              if (liveTs) liveTs.textContent = '· ' + new Date().toLocaleTimeString();
-              const alerts = (data && data.alerts) || [];
-              if (!alerts.length) return;
-              // alerts llegan en orden cronológico (oldest first); al insertar
-              // cada uno antes del firstChild, el último insertado (el más nuevo)
-              // queda en la posición 0.
-              const rows = alerts.map(buildRow);
-              rows.forEach(r => tbody.insertBefore(r, tbody.firstChild));
-              let maxTs = lastTs;
-              alerts.forEach(a => { const t = parseInt(a.timestamp, 10) || 0; if (t > maxTs) maxTs = t; });
-              lastTs = maxTs;
-              applyFilters();
-            })
-            .catch(() => { if (live) live.classList.add('off'); })
-            .finally(() => { inFlight = false; });
-        }
-        setInterval(poll, 3000);
-      })();
-    </script>
+    <!-- 2. Your scripts after -->
+    <script src="{{ url_for('static', filename='scripts/data.js') }}"></script>
+    <script type="text/babel" src="{{ url_for('static', filename='scripts/charts.jsx') }}"></script>
+    <script type="text/babel" src="{{ url_for('static', filename='scripts/app.jsx') }}"></script>
   </body>
 </html>
