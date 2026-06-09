@@ -93,6 +93,31 @@ def api_reports():
     return jsonify({'reports': get_reports()})
 
 
+@app.route('/api/whitelist', methods=['GET', 'POST'])
+def api_whitelist():
+    if request.method == 'POST':
+        data = request.get_json(silent=True) or {}
+        ip = data.get('ip')
+        mac = data.get('mac')
+        note = data.get('note')
+        try:
+            key = add_whitelist_entry(ip, mac, note)
+            return jsonify({'ok': True, 'key': key})
+        except ValueError as e:
+            return jsonify({'ok': False, 'error': str(e)}), 400
+    return jsonify({'whitelist': get_whitelist()})
+
+
+@app.route('/api/whitelist/remove', methods=['POST'])
+def api_whitelist_remove():
+    data = request.get_json(silent=True) or {}
+    key = data.get('key')
+    if not key:
+        return jsonify({'ok': False, 'error': 'Falta key'}), 400
+    remove_whitelist_entry(key)
+    return jsonify({'ok': True})
+
+
 if __name__ == '__main__':
     start_monitoring()
     app.run(
