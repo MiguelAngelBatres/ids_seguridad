@@ -4,6 +4,7 @@ import threading
 import time
 import urllib.request
 import urllib.error
+import uuid
 from pathlib import Path
 
 from .emailer import send_alert_email
@@ -83,15 +84,20 @@ def _rebuild_blacklist_sets(blacklist):
 _initial_blacklist = load_json(BLACKLIST_FILE)
 _initial_ips, _initial_domains = _rebuild_blacklist_sets(_initial_blacklist)
 
+_alerts = load_json(ALERTS_FILE)
+for a in _alerts:
+    if 'id' not in a:
+        a['id'] = str(uuid.uuid4())
+
 _STATE = {
     'whitelist': load_json(WHITELIST_FILE),
     'reports': load_json(REPORTS_FILE),
-    'alerts': load_json(ALERTS_FILE),
+    'alerts': _alerts,
     'blacklist': _initial_blacklist,
     'blacklist_ips': _initial_ips,
     'blacklist_domains': _initial_domains,
 }
-_NEEDS_FLUSH = False
+_NEEDS_FLUSH = True
 
 
 def _disk_flusher():
@@ -193,6 +199,11 @@ def get_whitelist():
         return list(_STATE['whitelist'])
 
 
+def get_blacklist():
+    with _DATA_LOCK:
+        return list(_STATE['blacklist'])
+
+
 def add_whitelist_entry(ip, mac, note=None):
     global _NEEDS_FLUSH
     ip = (ip or '').strip() or None
@@ -253,6 +264,13 @@ def clear_alerts(type_filter=None):
             _STATE['alerts'] = [a for a in _STATE['alerts'] if a.get('type') != type_filter]
         else:
             _STATE['alerts'] = []
+        _NEEDS_FLUSH = True
+
+def delete_alerts_batch(ids):
+    global _NEEDS_FLUSH
+    with _DATA_LOCK:
+        ids_set = set(ids)
+        _STATE['alerts'] = [a for a in _STATE['alerts'] if a.get('id') not in ids_set]
         _NEEDS_FLUSH = True
 
 
@@ -318,6 +336,9 @@ def _detect_arp_spoof(event, whitelist):
 
 def _persist_alert(alert):
     global _NEEDS_FLUSH
+    if 'id' not in alert:
+        alert['id'] = str(uuid.uuid4())
+        
     with _DATA_LOCK:
         _STATE['alerts'].append(alert)
         if len(_STATE['alerts']) > _MAX_EVENTS:

@@ -231,6 +231,7 @@ function Alerts({ t, lang, liveTs, data, onClear }) {
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState('all');
   const [open, setOpen] = useState({});
+  const [selected, setSelected] = useState(new Set());
 
   function quickWhitelist(ip, mac) {
     if (!confirm(`¿Agregar ${ip || mac} a la lista blanca?`)) return;
@@ -263,6 +264,58 @@ function Alerts({ t, lang, liveTs, data, onClear }) {
     return hay.includes(q.toLowerCase());
   });
 
+  const shownIds = shown.map(a => a.id).filter(Boolean);
+  const isAllSelected = shownIds.length > 0 && shownIds.every(id => selected.has(id));
+  const isSomeSelected = shownIds.length > 0 && shownIds.some(id => selected.has(id)) && !isAllSelected;
+
+  function toggleAll() {
+    const next = new Set(selected);
+    if (isAllSelected) {
+      shownIds.forEach(id => next.delete(id));
+    } else {
+      shownIds.forEach(id => next.add(id));
+    }
+    setSelected(next);
+  }
+
+  function toggleOne(id) {
+    if (!id) return;
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelected(next);
+  }
+
+  function deleteSelected() {
+    const arr = Array.from(selected);
+    if (!confirm(`¿Eliminar ${arr.length} alertas seleccionadas?`)) return;
+    fetch('/api/alerts/delete_batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: arr })
+    }).then(() => setSelected(new Set()));
+  }
+
+  function whitelistSelected() {
+    const toWhitelist = alerts.filter(a => selected.has(a.id) && (a.src_ip || a.src_mac));
+    if (!toWhitelist.length) {
+      alert("Ninguna alerta seleccionada tiene una IP o MAC válida.");
+      return;
+    }
+    if (!confirm(`¿Agregar ${toWhitelist.length} dispositivos a la Lista Blanca?`)) return;
+    
+    Promise.all(toWhitelist.map(a => 
+      fetch('/api/whitelist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ip: a.src_ip, mac: a.src_mac, note: 'Agregado en lote desde Alertas' })
+      })
+    )).then(() => {
+      alert(`${toWhitelist.length} dispositivos agregados a la lista blanca exitosamente.`);
+      setSelected(new Set());
+    });
+  }
+
   return (
     <div className="screen">
       <div className="toolbar">
@@ -274,16 +327,32 @@ function Alerts({ t, lang, liveTs, data, onClear }) {
           ))}
         </div>
         <div className="toolbar-right">
-          <div className="search"><span className="search-i">⌕</span>
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar…" />
-          </div>
-          <Live t={t} ts={liveTs} />
-          <button className="btn-danger" onClick={() => { 
-            const msg = filter === 'all' ? '¿Limpiar todas las alertas?' : `¿Limpiar alertas de tipo ${filter}?`;
-            if (confirm(msg)) onClear(filter); 
-          }}>
-            Limpiar alertas
-          </button>
+          {selected.size > 0 ? (
+            <>
+              <span className="count-pill mono" style={{ background: '#3ddc97', color: '#0a0e12' }}>
+                {selected.size} sel
+              </span>
+              <button className="btn" onClick={whitelistSelected} style={{ background: '#0a0e12', border: '1px solid #3ddc97', color: '#3ddc97' }}>
+                Agregar a WL
+              </button>
+              <button className="btn-danger" onClick={deleteSelected}>
+                Eliminar Seleccionados
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="search"><span className="search-i">⌕</span>
+                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar…" />
+              </div>
+              <Live t={t} ts={liveTs} />
+              <button className="btn-danger" onClick={() => { 
+                const msg = filter === 'all' ? '¿Limpiar todas las alertas?' : `¿Limpiar alertas de tipo ${filter}?`;
+                if (confirm(msg)) onClear(filter); 
+              }}>
+                Limpiar alertas
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -292,6 +361,9 @@ function Alerts({ t, lang, liveTs, data, onClear }) {
           <table className="data-table">
             <thead>
               <tr>
+                <th style={{ width: '32px', textAlign: 'center' }}>
+                  <input type="checkbox" checked={isAllSelected} ref={el => el && (el.indeterminate = isSomeSelected)} onChange={toggleAll} />
+                </th>
                 <th className="w-time">Hora</th><th>Tipo</th><th>Origen</th>
                 <th>Destino</th><th>Proto</th><th>Riesgo</th><th className="w-ev">Evidencia</th><th className="w-ws">Wireshark</th>
               </tr>
@@ -299,9 +371,13 @@ function Alerts({ t, lang, liveTs, data, onClear }) {
             <tbody>
               {shown.map((a, i) => {
                 const sev = alertSeverity(a);
+                const isSelected = !!a.id && selected.has(a.id);
                 return (
-                  <React.Fragment key={a.timestamp + '-' + i}>
-                    <tr className="data-row" style={{ '--sev': SEV[sev].c }}>
+                  <React.Fragment key={a.id || (a.timestamp + '-' + i)}>
+                    <tr className={'data-row' + (isSelected ? ' selected' : '')} style={{ '--sev': SEV[sev].c }}>
+                      <td style={{ textAlign: 'center' }}>
+                        {a.id && <input type="checkbox" checked={isSelected} onChange={() => toggleOne(a.id)} />}
+                      </td>
                       <td className="mono nowrap">{fmtTime(a.timestamp)}</td>
                       <td><TypeBadge a={a} /></td>
                       <td className="mono">
@@ -333,7 +409,7 @@ function Alerts({ t, lang, liveTs, data, onClear }) {
                       <td className="ws-cell"><CopyWsBtn r={a} /></td>
                     </tr>
                     {open[i] && a.evidence && (
-                      <tr className="ev-row"><td colSpan="8">
+                      <tr className="ev-row"><td colSpan="9">
                         <div className="ev-box">
                           {a.type === 'arp_spoof' && (
                             <div className="ev-line"><span className="ev-k">esperada</span><span className="mono">{a.expected_mac}</span>

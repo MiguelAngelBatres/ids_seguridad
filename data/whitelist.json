@@ -1,1 +1,164 @@
-[]
+[
+  {
+    "key": "10.13.60.199-6e:5c:78:2a:95:58-1781030511",
+    "ip": "10.13.60.199",
+    "mac": "6e:5c:78:2a:95:58",
+    "note": "Agregado desde Alertas"
+  },
+  {
+    "key": "10.13.146.241-fa:30:6e:2d:c5:60-1781030523",
+    "ip": "10.13.146.241",
+    "mac": "fa:30:6e:2d:c5:60",
+    "note": "Agregado desde Alertas"
+  },
+  {
+    "key": "10.13.39.178-ce:22:cd:f6:7f:fb-1781030530",
+    "ip": "10.13.39.178",
+    "mac": "ce:22:cd:f6:7f:fb",
+    "note": "Agregado desde Alertas"
+  },
+  {
+    "key": "10.13.214.45-62:cb:da:e5:12:b7-1781030538",
+    "ip": "10.13.214.45",
+    "mac": "62:cb:da:e5:12:b7",
+    "note": "Agregado desde Alertas"
+  },
+  {
+    "key": "10.13.6.72-12:16:6e:3d:f1:08-1781030553",
+    "ip": "10.13.6.72",
+    "mac": "12:16:6e:3d:f1:08",
+    "note": "Agregado desde Alertas"
+  },
+  {
+    "key": "192.168.127.254-ca:66:5d:f0:fd:8a-1781030556",
+    "ip": "192.168.127.254",
+    "mac": "ca:66:5d:f0:fd:8a",
+    "note": "Agregado desde Alertas"
+  },
+  {
+    "key": "10.13.116.231-bc:17:b8:02:10:ac-1781030561",
+    "ip": "10.13.116.231",
+    "mac": "bc:17:b8:02:10:ac",
+    "note": "Agregado desde Alertas"
+  },
+  {
+    "key": "10.13.227.217-5e:bd:57:41:51:d3-1781030564",
+    "ip": "10.13.227.217",
+    "mac": "5e:bd:57:41:51:d3",
+    "note": "Agregado desde Alertas"
+  },
+  {
+    "key": "10.13.210.118-22:33:0e:73:04:ce-1781030567",
+    "ip": "10.13.210.118",
+    "mac": "22:33:0e:73:04:ce",
+    "note": "Agregado desde Alertas"
+  },
+  {
+    "key": "10.13.112.143-7a:eb:1a:c5:c2:3d-1781030571",
+    "ip": "10.13.112.143",
+    "mac": "7a:eb:1a:c5:c2:3d",
+    "note": "Agregado desde Alertas"
+  },
+  {
+    "key": "10.13.118.67-06:f5:40:88:88:03-1781030575",
+    "ip": "10.13.118.67",
+    "mac": "06:f5:40:88:88:03",
+    "note": "Agregado desde Alertas"
+  },
+  {
+    "key": "10.13.189.91-b8:3c:28:0d:7a:43-1781030588",
+    "ip": "10.13.189.91",
+    "mac": "b8:3c:28:0d:7a:43",
+    "note": "Agregado desde Alertas"
+  },
+  {
+    "key": "10.13.154.119-60:3e:5f:20:69:ea-1781030591",
+    "ip": "10.13.154.119",
+    "mac": "60:3e:5f:20:69:ea",
+    "note": "Agregado desde Alertas"
+  },
+  {
+    "key": "10.13.107.126-26:9d:ba:3c:3c:c4-1781030597",
+    "ip": "10.13.107.126",
+    "mac": "26:9d:ba:3c:3c:c4",
+    "note": "Agregado desde Alertas"
+  },
+  {
+    "key": "10.13.15.136-56:38:ea:44:51:6c-1781030611",
+    "ip": "10.13.15.136",
+    "mac": "56:38:ea:44:51:6c",
+    "note": "Agregado desde Alertas"
+  },
+  {
+    "key": "10.13.178.175-6a:29:ec:f7:0a:ac-1781030615",
+    "ip": "10.13.178.175",
+    "mac": "6a:29:ec:f7:0a:ac",
+    "note": "Agregado desde Alertas"
+  },
+  {
+    "key": "10.13.192.73-76:fb:59:50:5f:56-1781030631",
+    "ip": "10.13.192.73",
+    "mac": "76:fb:59:50:5f:56",
+    "note": "Agregado desde Alertas"
+  },
+  {
+    "key": "10.13.228.44-d2:da:89:e3:86:1e-1781030639",
+    "ip": "10.13.228.44",
+    "mac": "d2:da:89:e3:86:1e",
+    "note": "Agregado desde Alertas"
+  },
+  {
+    "key": "10.13.218.128-36:ab:f9:e2:5b:40-1781030642",
+    "ip": "10.13.218.128",
+    "mac": "36:ab:f9:e2:5b:40",
+    "note": "Agregado desde Alertas"
+  },
+  {
+    "key": "10.13.136.152-f0:d7:93:56:18:aa-1781030644",
+    "ip": "10.13.136.152",
+    "mac": "f0:d7:93:56:18:aa",
+    "note": "Agregado desde Alertas"
+  },
+  {
+    "key": "10.13.5.145-8a:ea:a1:ad:69:e9-1781030651",
+    "ip": "10.13.5.145",
+    "mac": "8a:ea:a1:ad:69:e9",
+    "note": "Agregado desde Alertas"
+  },
+  {
+    "key": "10.13.120.74-a2:7f:c0:5e:3f:bc-1781030657",
+    "ip": "10.13.120.74",
+    "mac": "a2:7f:c0:5e:3f:bc",
+    "note": "Agregado desde Alertas"
+  },
+  {
+    "key": "10.13.150.220-36:8d:d0:15:e1:ab-1781030661",
+    "ip": "10.13.150.220",
+    "mac": "36:8d:d0:15:e1:ab",
+    "note": "Agregado desde Alertas"
+  },
+  {
+    "key": "10.13.236.47-06:1e:e0:c3:8b:0d-1781030665",
+    "ip": "10.13.236.47",
+    "mac": "06:1e:e0:c3:8b:0d",
+    "note": "Agregado desde Alertas"
+  },
+  {
+    "key": "10.13.233.207-b8:7e:39:08:52:7e-1781030688",
+    "ip": "10.13.233.207",
+    "mac": "b8:7e:39:08:52:7e",
+    "note": "Agregado desde Alertas"
+  },
+  {
+    "key": "10.13.55.221-22:4f:6e:ae:02:72-1781030691",
+    "ip": "10.13.55.221",
+    "mac": "22:4f:6e:ae:02:72",
+    "note": "Agregado desde Alertas"
+  },
+  {
+    "key": "10.13.244.247-42:29:c9:ad:73:83-1781030694",
+    "ip": "10.13.244.247",
+    "mac": "42:29:c9:ad:73:83",
+    "note": "Agregado desde Alertas"
+  }
+]
