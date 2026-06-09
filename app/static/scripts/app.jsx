@@ -5,7 +5,7 @@
 ========================================================= */
 const { useState, useEffect, useMemo, useRef } = React;
 const D = window.IDS_DATA || {};
-const INIT = window.__INITIAL_DATA__ || { reports: [], alerts: [], whitelist: [] };
+const INIT = window.__INITIAL_DATA__ || { reports: [], alerts: [], whitelist: [], blacklist: [] };
 
 const I18N = D.I18N || {};
 
@@ -177,6 +177,13 @@ function Overview({ t, lang, now, data }) {
       <div className="grid-2">
         <section className="card span-2-wide">
           <div className="card-head"><h3>Alertas en el tiempo</h3><span className="card-tag mono">{alerts.length} total</span></div>
+          {agg.buckets.length > 0 ? (
+             <div className="chart-wrap" style={{ height: '220px', marginTop: '12px' }}>
+               <AreaTimeline series={agg.buckets} labels={agg.blabels} height={220} color="#3ddc97" />
+             </div>
+          ) : (
+            <div className="empty small">No hay suficientes datos de alertas</div>
+          )}
         </section>
         <section className="card">
           <div className="card-head"><h3>Distribución de riesgo</h3></div>
@@ -225,6 +232,21 @@ function Alerts({ t, lang, liveTs, data, onClear }) {
   const [filter, setFilter] = useState('all');
   const [open, setOpen] = useState({});
 
+  function quickWhitelist(ip, mac) {
+    if (!confirm(`¿Agregar ${ip || mac} a la lista blanca?`)) return;
+    fetch('/api/whitelist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ip, mac, note: 'Agregado desde Alertas' }),
+    }).then(r => r.json()).then(d => {
+      if (d.ok) {
+        alert('Agregado a lista blanca exitosamente.');
+      } else {
+        alert('Error: ' + d.error);
+      }
+    });
+  }
+
   const alerts = data.alerts;
   const rows = useMemo(() => [...alerts].reverse(), [alerts]);
   const types = ['all', 'unauthorized_device', 'threat_intel', 'arp_spoof', 'heuristic'];
@@ -256,7 +278,10 @@ function Alerts({ t, lang, liveTs, data, onClear }) {
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar…" />
           </div>
           <Live t={t} ts={liveTs} />
-          <button className="btn-danger" onClick={() => { if (confirm('¿Limpiar todas las alertas?')) onClear(); }}>
+          <button className="btn-danger" onClick={() => { 
+            const msg = filter === 'all' ? '¿Limpiar todas las alertas?' : `¿Limpiar alertas de tipo ${filter}?`;
+            if (confirm(msg)) onClear(filter); 
+          }}>
             Limpiar alertas
           </button>
         </div>
@@ -279,7 +304,22 @@ function Alerts({ t, lang, liveTs, data, onClear }) {
                     <tr className="data-row" style={{ '--sev': SEV[sev].c }}>
                       <td className="mono nowrap">{fmtTime(a.timestamp)}</td>
                       <td><TypeBadge a={a} /></td>
-                      <td className="mono"><div>{a.src_ip || 'N/D'}</div><div className="sub">{a.src_mac || ''}</div></td>
+                      <td className="mono">
+                        <div>{a.src_ip || 'N/D'}</div>
+                        <div className="sub">
+                          {a.src_mac || ''}
+                          {a.type === 'unauthorized_device' && (
+                            <button 
+                              className="btn-tiny" 
+                              style={{ marginLeft: '8px', padding: '1px 6px', fontSize: '10px', background: '#3ddc97', color: '#0a0e12', border: 'none', borderRadius: '3px', cursor: 'pointer' }}
+                              onClick={() => quickWhitelist(a.src_ip, a.src_mac)}
+                              title="Agregar IP/MAC a la Lista Blanca"
+                            >
+                              + WL
+                            </button>
+                          )}
+                        </div>
+                      </td>
                       <td className="mono"><div>{(a.dst || 'N/D') + (a.dst_port ? ':' + a.dst_port : '')}</div><div className="sub">{a.domain || ''}</div></td>
                       <td><ProtoChip p={a.protocol} /></td>
                       <td className="risk-cell">{a.risk}</td>
@@ -350,7 +390,10 @@ function Reports({ t, lang, liveTs, data, onClear }) {
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar…" />
           </div>
           <Live t={t} ts={liveTs} />
-          <button className="btn-danger" onClick={() => { if (confirm('¿Limpiar todos los reportes?')) onClear(); }}>
+          <button className="btn-danger" onClick={() => { 
+            const msg = filter === 'all' ? '¿Limpiar todos los reportes?' : `¿Limpiar reportes de protocolo ${filter}?`;
+            if (confirm(msg)) onClear(filter); 
+          }}>
             Limpiar reportes
           </button>
         </div>
@@ -493,6 +536,128 @@ function Whitelist({ t, lang }) {
   }
 
   /* ============================================================
+     BLACKLIST
+  ============================================================ */
+  function Blacklist() {
+    const [entries, setEntries] = useState([]);
+    const [msg, setMsg] = useState('');
+    const ipRef = useRef(null);
+    const hostRef = useRef(null);
+    const domainRef = useRef(null);
+    const riskRef = useRef(null);
+    const noteRef = useRef(null);
+
+    function fetchBlacklist() {
+      fetch('/api/blacklist')
+        .then(r => r.json())
+        .then(d => { if (d.blacklist) setEntries(d.blacklist); })
+        .catch(() => {});
+    }
+
+    useEffect(() => { fetchBlacklist(); }, []);
+
+    function addEntry(e) {
+      e.preventDefault();
+      const ip = ipRef.current ? ipRef.current.value.trim() : '';
+      const host = hostRef.current ? hostRef.current.value.trim() : '';
+      const domain = domainRef.current ? domainRef.current.value.trim() : '';
+      const risk = riskRef.current ? riskRef.current.value.trim() : '';
+      const note = noteRef.current ? noteRef.current.value.trim() : '';
+      if (!ip && !host && !domain) return;
+      fetch('/api/blacklist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ip, host, domain, risk, note }),
+      })
+        .then(r => r.json())
+        .then(d => {
+          if (d.ok) {
+            if (ipRef.current) ipRef.current.value = '';
+            if (hostRef.current) hostRef.current.value = '';
+            if (domainRef.current) domainRef.current.value = '';
+            if (riskRef.current) riskRef.current.value = '';
+            if (noteRef.current) noteRef.current.value = '';
+            setMsg('');
+            fetchBlacklist();
+          } else {
+            setMsg(d.error || 'Error');
+          }
+        })
+        .catch(() => setMsg('Error de conexión'));
+    }
+
+    function removeEntry(key) {
+      fetch('/api/blacklist/remove', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key }),
+      })
+        .then(r => r.json())
+        .then(d => { if (d.ok) fetchBlacklist(); })
+        .catch(() => {});
+    }
+
+    return (
+      <div className="screen wl-screen">
+        <div className="wl-grid">
+          <section className="card wl-form-card">
+            <div className="card-head"><h3>Agregar entrada</h3></div>
+            {msg && <div className="flash-err">{msg}</div>}
+            <form onSubmit={addEntry} className="wl-form">
+              <label className="field">
+                <span className="field-l">Dirección IP</span>
+                <input ref={ipRef} className="mono" name="ip" placeholder="192.168.1.50" />
+              </label>
+              <label className="field">
+                <span className="field-l">Host</span>
+                <input ref={hostRef} className="mono" name="host" placeholder="malicious.example.com" />
+              </label>
+              <label className="field">
+                <span className="field-l">Dominio</span>
+                <input ref={domainRef} className="mono" name="domain" placeholder="ejemplo.com" />
+              </label>
+              <label className="field">
+                <span className="field-l">Riesgo</span>
+                <input ref={riskRef} name="risk" placeholder="Botnet C2" />
+              </label>
+              <label className="field">
+                <span className="field-l">Nota</span>
+                <input ref={noteRef} name="note" placeholder="Fuente de inteligencia" />
+              </label>
+              <button type="submit" className="btn-primary">Agregar a la lista negra</button>
+            </form>
+          </section>
+
+          <section className="card wl-list-card">
+            <div className="card-head"><h3>Lista Negra</h3><span className="card-tag mono">{entries.length} entradas</span></div>
+            {entries.length ? (
+              <ul className="wl-list">
+                {entries.map((e) => (
+                  <li key={e.key} className="wl-item">
+                    <span className="wl-avatar mono">{(e.ip || e.host || e.domain || '?').slice(0, 2)}</span>
+                    <div className="wl-meta">
+                      <div className="wl-ids mono">
+                        {e.ip && <span className="wl-ip">{e.ip}</span>}
+                        {e.host && <span className="wl-mac">{e.host}</span>}
+                        {e.domain && <span className="wl-mac">{e.domain}</span>}
+                      </div>
+                      {e.risk && <div className="wl-note">Riesgo: {e.risk}</div>}
+                      {e.note && <div className="wl-note">{e.note}</div>}
+                    </div>
+                    <button className="wl-del" title="Eliminar" onClick={() => removeEntry(e.key)}>✕</button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="empty small">No hay entradas en la lista negra.</div>
+            )}
+          </section>
+        </div>
+      </div>
+    );
+  }
+
+  /* ============================================================
      APP SHELL
   ============================================================ */
   const NAV = [
@@ -500,6 +665,7 @@ function Whitelist({ t, lang }) {
     { id: 'alerts', icon: '⚠', key: 'Alertas' },
     { id: 'reports', icon: '≣', key: 'Reportes' },
     { id: 'whitelist', icon: '✓', key: 'Lista Blanca' },
+    { id: 'blacklist', icon: '✕', key: 'Lista Negra' },
   ];
 
   function App() {
@@ -511,6 +677,7 @@ function Whitelist({ t, lang }) {
     const [reports, setReports] = useState(INIT.reports);
     const [alerts, setAlerts] = useState(INIT.alerts);
     const [whitelist, setWhitelist] = useState(INIT.whitelist);
+    const [blacklist, setBlacklist] = useState(INIT.blacklist);
 
     const lastAlertTs = useRef(
       INIT.alerts.reduce((max, a) => Math.max(max, a.timestamp || 0), 0)
@@ -608,19 +775,35 @@ function Whitelist({ t, lang }) {
     const liveTs = '· ' + fmtClock(clock);
     const data = { reports, alerts, whitelist };
 
-    function clearAlerts() {
-      fetch('/api/alerts/clear', { method: 'POST' })
+    function clearAlerts(typeFilter) {
+      fetch('/api/alerts/clear', { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: typeFilter === 'all' ? null : typeFilter })
+      })
         .then(() => {
-          setAlerts([]);
+          if (typeFilter === 'all') {
+            setAlerts([]);
+          } else {
+            setAlerts(prev => prev.filter(a => a.type !== typeFilter));
+          }
           lastAlertTs.current = Math.floor(Date.now() / 1000);
         })
         .catch(() => { });
     }
 
-    function clearReports() {
-      fetch('/api/reports/clear', { method: 'POST' })
+    function clearReports(protoFilter) {
+      fetch('/api/reports/clear', { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ protocol: protoFilter === 'all' ? null : protoFilter })
+      })
         .then(() => {
-          setReports([]);
+          if (protoFilter === 'all') {
+            setReports([]);
+          } else {
+            setReports(prev => prev.filter(r => r.protocol !== protoFilter));
+          }
           lastReportTs.current = Math.floor(Date.now() / 1000);
         })
         .catch(() => { });
@@ -639,6 +822,7 @@ function Whitelist({ t, lang }) {
                 <span className="nav-ic">{n.icon}</span>
                 <span>{n.key}</span>
                 {n.id === 'alerts' && <span className="nav-badge">{alerts.length}</span>}
+                {n.id === 'blacklist' && <span className="nav-badge">{blacklist.length}</span>}
               </button>
             ))}
           </nav>
@@ -673,6 +857,7 @@ function Whitelist({ t, lang }) {
             {screen === 'alerts' && <Alerts t={t} lang={lang} liveTs={liveTs} data={data} onClear={clearAlerts} />}
             {screen === 'reports' && <Reports t={t} lang={lang} liveTs={liveTs} data={data} onClear={clearReports} />}
             {screen === 'whitelist' && <Whitelist />}
+            {screen === 'blacklist' && <Blacklist />}
           </div>
         </main>
       </div>

@@ -14,7 +14,8 @@ services:
       SCAPY_IFACE: ${SCAPY_IFACE:-}
       SCAPY_BPF: ${SCAPY_BPF:-}
 
-    network_mode: host
+    ports:
+      - "5000:5000"
 
     cap_add:
       - NET_ADMIN
