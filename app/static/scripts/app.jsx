@@ -166,7 +166,7 @@ function Overview({ t, lang, now, data }) {
 /* ============================================================
    ALERTS
 ============================================================ */
-function Alerts({ t, lang, liveTs, data }) {
+function Alerts({ t, lang, liveTs, data, onClear }) {
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState('all');
   const [open, setOpen] = useState({});
@@ -202,6 +202,9 @@ function Alerts({ t, lang, liveTs, data }) {
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar…" />
           </div>
           <Live t={t} ts={liveTs} />
+          <button className="btn-danger" onClick={() => { if (confirm('¿Limpiar todas las alertas?')) onClear(); }}>
+            Limpiar alertas
+          </button>
         </div>
       </div>
 
@@ -261,7 +264,7 @@ function Alerts({ t, lang, liveTs, data }) {
 /* ============================================================
    REPORTS
 ============================================================ */
-function Reports({ t, lang, liveTs, data }) {
+function Reports({ t, lang, liveTs, data, onClear }) {
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState('all');
 
@@ -292,6 +295,9 @@ function Reports({ t, lang, liveTs, data }) {
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar…" />
           </div>
           <Live t={t} ts={liveTs} />
+          <button className="btn-danger" onClick={() => { if (confirm('¿Limpiar todos los reportes?')) onClear(); }}>
+            Limpiar reportes
+          </button>
         </div>
       </div>
 
@@ -328,26 +334,77 @@ function Reports({ t, lang, liveTs, data }) {
 /* ============================================================
    WHITELIST
 ============================================================ */
-function Whitelist({ t, lang, data }) {
-  const [entries, setEntries] = useState(() => [...(data.whitelist || [])]);
+function Whitelist({ t, lang }) {
+  const [entries, setEntries] = useState([]);
+  const [msg, setMsg] = useState('');
+  const ipRef = useRef(null);
+  const macRef = useRef(null);
+  const noteRef = useRef(null);
+
+  function fetchWhitelist() {
+    fetch('/api/whitelist')
+      .then(r => r.json())
+      .then(d => { if (d.whitelist) setEntries(d.whitelist); })
+      .catch(() => {});
+  }
+
+  useEffect(() => { fetchWhitelist(); }, []);
+
+  function addEntry(e) {
+    e.preventDefault();
+    const ip = ipRef.current ? ipRef.current.value.trim() : '';
+    const mac = macRef.current ? macRef.current.value.trim() : '';
+    const note = noteRef.current ? noteRef.current.value.trim() : '';
+    if (!ip && !mac) return;
+    fetch('/api/whitelist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ip, mac, note }),
+    })
+      .then(r => r.json())
+      .then(d => {
+        if (d.ok) {
+          if (ipRef.current) ipRef.current.value = '';
+          if (macRef.current) macRef.current.value = '';
+          if (noteRef.current) noteRef.current.value = '';
+          setMsg('');
+          fetchWhitelist();
+        } else {
+          setMsg(d.error || 'Error');
+        }
+      })
+      .catch(() => setMsg('Error de conexión'));
+  }
+
+  function removeEntry(key) {
+    fetch('/api/whitelist/remove', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key }),
+    })
+      .then(r => r.json())
+      .then(d => { if (d.ok) fetchWhitelist(); })
+      .catch(() => {});
+  }
 
   return (
     <div className="screen wl-screen">
       <div className="wl-grid">
         <section className="card wl-form-card">
           <div className="card-head"><h3>Agregar entrada</h3></div>
-          <form method="post" action="/whitelist" className="wl-form">
+          {msg && <div className="flash-err">{msg}</div>}
+          <form onSubmit={addEntry} className="wl-form">
             <label className="field">
               <span className="field-l">Dirección IP</span>
-              <input className="mono" name="ip" placeholder="192.168.1.50" />
+              <input ref={ipRef} className="mono" name="ip" placeholder="192.168.1.50" />
             </label>
             <label className="field">
               <span className="field-l">Dirección MAC <em>opcional</em></span>
-              <input className="mono" name="mac" placeholder="aa:bb:cc:dd:ee:ff" />
+              <input ref={macRef} className="mono" name="mac" placeholder="aa:bb:cc:dd:ee:ff" />
             </label>
             <label className="field">
               <span className="field-l">Nota</span>
-              <input name="note" placeholder="Ej. Impresora de oficina" />
+              <input ref={noteRef} name="note" placeholder="Ej. Impresora de oficina" />
             </label>
             <button type="submit" className="btn-primary">Agregar a la lista</button>
           </form>
@@ -367,10 +424,7 @@ function Whitelist({ t, lang, data }) {
                     </div>
                     {e.note && <div className="wl-note">{e.note}</div>}
                   </div>
-                  <form method="post" action="/whitelist/remove" style={{ display: 'inline' }}>
-                    <input type="hidden" name="key" value={e.key} />
-                    <button className="wl-del" title="Eliminar">✕</button>
-                  </form>
+                  <button className="wl-del" title="Eliminar" onClick={() => removeEntry(e.key)}>✕</button>
                 </li>
               ))}
             </ul>
@@ -447,17 +501,13 @@ function App() {
     return () => clearInterval(id);
   }, []);
 
-  // Poll whitelist
+  // Poll whitelist for sidebar updates
   useEffect(() => {
-    const id = setInterval(async () => {
-      try {
-        const r = await fetch('/whitelist');
-        const html = await r.text();
-        const m = html.match(/<ul class="wl-list">([\s\S]*?)<\/ul>/);
-        if (m) {
-          setWhitelist(INIT.whitelist);
-        }
-      } catch (e) {}
+    const id = setInterval(() => {
+      fetch('/api/whitelist')
+        .then(r => r.json())
+        .then(d => { if (d.whitelist) setWhitelist(d.whitelist); })
+        .catch(() => {});
     }, 5000);
     return () => clearInterval(id);
   }, []);
@@ -503,6 +553,24 @@ function App() {
   const liveTs = '· ' + fmtClock(clock);
   const data = { reports, alerts, whitelist };
 
+  function clearAlerts() {
+    fetch('/alerts/clear', { method: 'POST' })
+      .then(() => {
+        setAlerts([]);
+        lastAlertTs.current = Math.floor(Date.now() / 1000);
+      })
+      .catch(() => {});
+  }
+
+  function clearReports() {
+    fetch('/reports/clear', { method: 'POST' })
+      .then(() => {
+        setReports([]);
+        lastReportTs.current = Math.floor(Date.now() / 1000);
+      })
+      .catch(() => {});
+  }
+
   return (
     <div className="app">
       <aside className="sidebar">
@@ -547,9 +615,9 @@ function App() {
         </header>
         <div className="content">
           {screen === 'overview' && <Overview t={t} lang={lang} now={now} data={data} />}
-          {screen === 'alerts' && <Alerts t={t} lang={lang} liveTs={liveTs} data={data} />}
-          {screen === 'reports' && <Reports t={t} lang={lang} liveTs={liveTs} data={data} />}
-          {screen === 'whitelist' && <Whitelist t={t} lang={lang} data={data} />}
+          {screen === 'alerts' && <Alerts t={t} lang={lang} liveTs={liveTs} data={data} onClear={clearAlerts} />}
+          {screen === 'reports' && <Reports t={t} lang={lang} liveTs={liveTs} data={data} onClear={clearReports} />}
+          {screen === 'whitelist' && <Whitelist />}
         </div>
       </main>
     </div>

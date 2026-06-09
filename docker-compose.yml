@@ -14,12 +14,11 @@ services:
       SCAPY_IFACE: ${SCAPY_IFACE:-}
       SCAPY_BPF: ${SCAPY_BPF:-}
 
+    network_mode: host
+
     cap_add:
       - NET_ADMIN
       - NET_RAW
-
-    ports:
-      - "5000:5000"
 
     volumes:
       - .:/app

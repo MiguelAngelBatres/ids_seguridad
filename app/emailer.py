@@ -74,9 +74,12 @@ else:
     SMTP_USE_TLS = _use_tls_env.strip().lower() in ('1', 'true', 'yes', 'on', 'si', 'sí')
 
 EMAIL_COOLDOWN = _env_int('EMAIL_COOLDOWN', 300)
+EMAIL_RATE_MAX = _env_int('EMAIL_RATE_MAX', 6)
 
 _dedupe_lock = threading.Lock()
+_rate_lock = threading.Lock()
 _sent_signatures = {}
+_sent_timestamps = []
 
 
 def _alert_signature(alert):
@@ -298,12 +301,30 @@ def format_alert_body(alert, whois_result=None):
     return '\n'.join(lines)
 
 
+def _global_rate_allowed():
+    if EMAIL_RATE_MAX <= 0:
+        return True
+    now = time.time()
+    with _rate_lock:
+        cutoff = now - 60
+        _sent_timestamps[:] = [ts for ts in _sent_timestamps if ts >= cutoff]
+        if len(_sent_timestamps) >= EMAIL_RATE_MAX:
+            return False
+        _sent_timestamps.append(now)
+        return True
+
+
 def send_alert_email(alert, whois_result=None):
     if not ADMIN_EMAIL:
         print('No ADMIN_EMAIL configurado, omitiendo envío de correo')
         return False
     if not SMTP_HOST and not OAUTH_ENABLED:
         print('No SMTP_HOST ni credenciales OAuth configuradas, omitiendo envío de correo')
+        return False
+
+    if not _global_rate_allowed():
+        sig = _alert_signature(alert)
+        print(f'Límite de tasa alcanzado ({EMAIL_RATE_MAX}/min), silenciado: {sig}')
         return False
 
     signature = _alert_signature(alert)
