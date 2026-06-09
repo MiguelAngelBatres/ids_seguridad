@@ -292,13 +292,31 @@ def clear_reports(proto_filter=None):
 def _source_whitelisted(event, whitelist):
     src_mac = normalize_mac(event.get('src_mac'))
     src_ip = event.get('src_ip')
+    
+    parsed_src_ip = None
+    if src_ip:
+        try:
+            parsed_src_ip = ipaddress.ip_address(src_ip)
+        except ValueError:
+            pass
+
     for entry in whitelist:
         entry_ip = entry.get('ip')
         entry_mac = normalize_mac(entry.get('mac'))
-        if src_ip and entry_ip and src_ip == entry_ip:
-            return True
+        
+        if parsed_src_ip and entry_ip:
+            if '/' in entry_ip:
+                try:
+                    if parsed_src_ip in ipaddress.ip_network(entry_ip, strict=False):
+                        return True
+                except ValueError:
+                    pass
+            elif src_ip == entry_ip:
+                return True
+                
         if src_mac and entry_mac and src_mac == entry_mac:
             return True
+            
     return False
 
 
