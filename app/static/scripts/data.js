@@ -133,10 +133,17 @@
     { key: '192.168.1.39--1780498900', ip: '192.168.1.39', mac: null, note: 'Mi computadora en la casa' },
     { key: '192.168.1.1--1780550197', ip: '192.168.1.1', mac: null, note: 'Router/gateway de la casa' },
   ];
+  
+  const blacklist = [
+    { key: 'bl-1', ip: '45.155.205.118', reason: 'Coincidencia con abuse.ch/feodo (Botnet)' },
+    { key: 'bl-2', ip: '185.220.101.7', reason: 'Actividad repetida de SYN flood' }
+  ];
+
 
   // ---- i18n -------------------------------------------------------
   const I18N = {
     es: {
+      bl_title: 'Lista Negra',
       brand_sub: 'Sistema de Detección de Intrusos',
       nav_overview: 'Resumen', nav_alerts: 'Alertas', nav_reports: 'Reportes', nav_whitelist: 'Lista Blanca',
       monitor_on: 'Monitor activo', monitor_iface: 'simulación', live: 'En vivo', updated: 'actualizado',
@@ -162,6 +169,7 @@
       expected: 'esperada', observed: 'observada', ago: 'hace',
     },
     en: {
+      bl_title: 'Blacklist',
       brand_sub: 'Intrusion Detection System',
       nav_overview: 'Overview', nav_alerts: 'Alerts', nav_reports: 'Reports', nav_whitelist: 'Whitelist',
       monitor_on: 'Monitor active', monitor_iface: 'simulation', live: 'Live', updated: 'updated',
@@ -184,5 +192,5 @@
     },
   };
 
-  window.IDS_DATA = { reports, alerts, whitelist, I18N, NOW };
+  window.IDS_DATA = { reports, alerts, whitelist, blacklist, I18N, NOW };
 })();
