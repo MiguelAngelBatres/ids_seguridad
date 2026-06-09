@@ -264,6 +264,58 @@ function Alerts({ t, lang, liveTs, data, onClear }) {
     return hay.includes(q.toLowerCase());
   });
 
+  const shownIds = shown.map(a => a.id).filter(Boolean);
+  const isAllSelected = shownIds.length > 0 && shownIds.every(id => selected.has(id));
+  const isSomeSelected = shownIds.length > 0 && shownIds.some(id => selected.has(id)) && !isAllSelected;
+
+  function toggleAll() {
+    const next = new Set(selected);
+    if (isAllSelected) {
+      shownIds.forEach(id => next.delete(id));
+    } else {
+      shownIds.forEach(id => next.add(id));
+    }
+    setSelected(next);
+  }
+
+  function toggleOne(id) {
+    if (!id) return;
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelected(next);
+  }
+
+  function deleteSelected() {
+    const arr = Array.from(selected);
+    if (!confirm(`¿Eliminar ${arr.length} alertas seleccionadas?`)) return;
+    fetch('/api/alerts/delete_batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: arr })
+    }).then(() => setSelected(new Set()));
+  }
+
+  function whitelistSelected() {
+    const toWhitelist = alerts.filter(a => selected.has(a.id) && (a.src_ip || a.src_mac));
+    if (!toWhitelist.length) {
+      alert("Ninguna alerta seleccionada tiene una IP o MAC válida.");
+      return;
+    }
+    if (!confirm(`¿Agregar ${toWhitelist.length} dispositivos a la Lista Blanca?`)) return;
+    
+    Promise.all(toWhitelist.map(a => 
+      fetch('/api/whitelist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ip: a.src_ip, mac: a.src_mac, note: 'Agregado en lote desde Alertas' })
+      })
+    )).then(() => {
+      alert(`${toWhitelist.length} dispositivos agregados a la lista blanca exitosamente.`);
+      setSelected(new Set());
+    });
+  }
+
   return (
     <div className="screen">
       <div className="toolbar">
@@ -275,16 +327,32 @@ function Alerts({ t, lang, liveTs, data, onClear }) {
           ))}
         </div>
         <div className="toolbar-right">
-          <div className="search"><span className="search-i">⌕</span>
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar…" />
-          </div>
-          <Live t={t} ts={liveTs} />
-          <button className="btn-danger" onClick={() => {
-            const msg = filter === 'all' ? '¿Limpiar todas las alertas?' : `¿Limpiar alertas de tipo ${filter}?`;
-            if (confirm(msg)) onClear(filter);
-          }}>
-            Limpiar alertas
-          </button>
+          {selected.size > 0 ? (
+            <>
+              <span className="count-pill mono" style={{ background: '#3ddc97', color: '#0a0e12' }}>
+                {selected.size} sel
+              </span>
+              <button className="btn" onClick={whitelistSelected} style={{ background: '#0a0e12', border: '1px solid #3ddc97', color: '#3ddc97' }}>
+                Agregar a WL
+              </button>
+              <button className="btn-danger" onClick={deleteSelected}>
+                Eliminar Seleccionados
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="search"><span className="search-i">⌕</span>
+                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar…" />
+              </div>
+              <Live t={t} ts={liveTs} />
+              <button className="btn-danger" onClick={() => {
+                const msg = filter === 'all' ? '¿Limpiar todas las alertas?' : `¿Limpiar alertas de tipo ${filter}?`;
+                if (confirm(msg)) onClear(filter);
+              }}>
+                Limpiar alertas
+              </button>
+            </>
+          )}
         </div>
       </div>
 
