@@ -2,6 +2,8 @@ import ipaddress
 import os
 import threading
 import time
+import urllib.request
+import urllib.error
 from pathlib import Path
 
 from .emailer import send_alert_email
@@ -65,10 +67,29 @@ _monitor_lock = threading.Lock()
 
 _DATA_LOCK = threading.Lock()
 _MAX_EVENTS = 10000
+
+def _rebuild_blacklist_sets(blacklist):
+    ips = set()
+    domains = set()
+    for entry in blacklist:
+        if entry.get('ip'):
+            ips.add(entry['ip'].lower())
+        if entry.get('host'):
+            domains.add(entry['host'].lower())
+        if entry.get('domain'):
+            domains.add(entry['domain'].lower())
+    return ips, domains
+
+_initial_blacklist = load_json(BLACKLIST_FILE)
+_initial_ips, _initial_domains = _rebuild_blacklist_sets(_initial_blacklist)
+
 _STATE = {
     'whitelist': load_json(WHITELIST_FILE),
     'reports': load_json(REPORTS_FILE),
     'alerts': load_json(ALERTS_FILE),
+    'blacklist': _initial_blacklist,
+    'blacklist_ips': _initial_ips,
+    'blacklist_domains': _initial_domains,
 }
 _NEEDS_FLUSH = False
 
@@ -94,6 +115,68 @@ def _disk_flusher():
 
 
 threading.Thread(target=_disk_flusher, daemon=True).start()
+
+
+def _update_external_blacklist():
+    while True:
+        try:
+            print("Descargando listas negras de inteligencia de amenazas...")
+            new_entries = []
+            
+            # 1. Feodo Tracker (Botnet C2)
+            try:
+                req = urllib.request.Request(
+                    'https://feodotracker.abuse.ch/downloads/ipblocklist.txt', 
+                    headers={'User-Agent': 'Mozilla/5.0 (IDS Console)'}
+                )
+                with urllib.request.urlopen(req, timeout=15) as r:
+                    for line in r.read().decode('utf-8').splitlines():
+                        line = line.strip()
+                        if line and not line.startswith('#'):
+                            new_entries.append({
+                                'ip': line,
+                                'risk': 'Botnet C2',
+                                'note': 'Abuse.ch Feodo Tracker'
+                            })
+            except Exception as e:
+                print(f"Error descargando Feodo Tracker: {e}")
+
+            # 2. CINS Army
+            try:
+                req = urllib.request.Request(
+                    'http://cinsscore.com/list/ci-badguys.txt',
+                    headers={'User-Agent': 'Mozilla/5.0 (IDS Console)'}
+                )
+                with urllib.request.urlopen(req, timeout=15) as r:
+                    for line in r.read().decode('utf-8').splitlines():
+                        line = line.strip()
+                        if line and not line.startswith('#'):
+                            new_entries.append({
+                                'ip': line,
+                                'risk': 'Malware/Scanner',
+                                'note': 'CINS Army'
+                            })
+            except Exception as e:
+                print(f"Error descargando CINS Army: {e}")
+
+            if new_entries:
+                ips, domains = _rebuild_blacklist_sets(new_entries)
+                with _DATA_LOCK:
+                    _STATE['blacklist'] = new_entries
+                    _STATE['blacklist_ips'] = ips
+                    _STATE['blacklist_domains'] = domains
+                try:
+                    save_json(BLACKLIST_FILE, new_entries)
+                except Exception as e:
+                    print(f"Error guardando blacklist: {e}")
+                print(f"Lista negra actualizada: {len(new_entries)} entradas.")
+
+        except Exception as e:
+            print(f"Error general en la actualizacion de la lista negra: {e}")
+            
+        time.sleep(86400) # 24 horas
+
+threading.Thread(target=_update_external_blacklist, daemon=True).start()
 
 
 def get_whitelist():
@@ -181,16 +264,19 @@ def _source_whitelisted(event, whitelist):
     return False
 
 
-def _find_threat(event, blacklist):
-    candidates = {
-        v.lower() for v in (event.get('dst'), event.get('domain')) if v
-    }
-    for entry in blacklist:
-        values = {
-            v.lower() for v in (entry.get('ip'), entry.get('host'), entry.get('domain')) if v
-        }
-        if candidates & values:
-            return entry
+def _find_threat(event):
+    dst = (event.get('dst') or '').lower()
+    domain = (event.get('domain') or '').lower()
+    
+    with _DATA_LOCK:
+        if dst in _STATE['blacklist_ips'] or domain in _STATE['blacklist_domains']:
+            candidates = {v for v in (dst, domain) if v}
+            for entry in _STATE['blacklist']:
+                values = {
+                    v.lower() for v in (entry.get('ip'), entry.get('host'), entry.get('domain')) if v
+                }
+                if candidates & values:
+                    return entry
     return None
 
 
@@ -250,7 +336,6 @@ def _handle_event(event):
         _NEEDS_FLUSH = True
 
     whitelist = get_whitelist()
-    blacklist = load_json(BLACKLIST_FILE)
     src_trusted = _source_whitelisted(event, whitelist)
 
     if not src_trusted and _is_local(event.get('src_ip')):
@@ -280,7 +365,7 @@ def _handle_event(event):
         for alert in get_engine().analyze(event):
             _emit_alert(alert)
 
-    threat = _find_threat(event, blacklist)
+    threat = _find_threat(event)
     if threat:
         alert = {
             'timestamp': event.get('timestamp', int(time.time())),
