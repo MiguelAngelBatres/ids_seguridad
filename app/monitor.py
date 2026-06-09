@@ -311,11 +311,15 @@ def _send_email_async(alert, with_whois=False):
         if with_whois:
             target = alert.get('dst') or alert.get('domain')
             whois_result = query_whois(target) if target else None
-            if whois_result and whois_result.get('abuse_contacts'):
+            if whois_result:
                 with _DATA_LOCK:
                     if 'evidence' not in alert:
                         alert['evidence'] = {}
-                    alert['evidence']['abuse_contacts'] = whois_result['abuse_contacts']
+                    if whois_result.get('abuse_contacts'):
+                        alert['evidence']['abuse_contacts'] = whois_result['abuse_contacts']
+                    if whois_result.get('raw'):
+                        lines = whois_result['raw'].splitlines()
+                        alert['evidence']['whois_raw'] = lines[:30] # Limitamos a 30 lineas para no saturar la UI
                     global _NEEDS_FLUSH
                     _NEEDS_FLUSH = True
         try:
