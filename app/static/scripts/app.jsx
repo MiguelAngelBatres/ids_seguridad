@@ -5,7 +5,7 @@
 ========================================================= */
 const { useState, useEffect, useMemo, useRef } = React;
 const D = window.IDS_DATA || {};
-const INIT = window.__INITIAL_DATA__ || { reports: [], alerts: [], whitelist: [] };
+const INIT = window.__INITIAL_DATA__ || { reports: [], alerts: [], whitelist: [], blacklist: [] };
 
 const I18N = D.I18N || {};
 
@@ -493,12 +493,126 @@ function Whitelist({ t, lang }) {
   }
 
   /* ============================================================
-    BLACKLIST
+     BLACKLIST
   ============================================================ */
-  const [screen, setScreen] = useState('overview');
-  const [wl, setWl] = useState(() => [...D.whitelist]);
-  const [bl, setBl] = useState(() => [...D.blacklist]); // <-- Nuevo estado para Blacklist
+  function Blacklist() {
+    const [entries, setEntries] = useState([]);
+    const [msg, setMsg] = useState('');
+    const ipRef = useRef(null);
+    const hostRef = useRef(null);
+    const domainRef = useRef(null);
+    const riskRef = useRef(null);
+    const noteRef = useRef(null);
 
+    function fetchBlacklist() {
+      fetch('/api/blacklist')
+        .then(r => r.json())
+        .then(d => { if (d.blacklist) setEntries(d.blacklist); })
+        .catch(() => {});
+    }
+
+    useEffect(() => { fetchBlacklist(); }, []);
+
+    function addEntry(e) {
+      e.preventDefault();
+      const ip = ipRef.current ? ipRef.current.value.trim() : '';
+      const host = hostRef.current ? hostRef.current.value.trim() : '';
+      const domain = domainRef.current ? domainRef.current.value.trim() : '';
+      const risk = riskRef.current ? riskRef.current.value.trim() : '';
+      const note = noteRef.current ? noteRef.current.value.trim() : '';
+      if (!ip && !host && !domain) return;
+      fetch('/api/blacklist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ip, host, domain, risk, note }),
+      })
+        .then(r => r.json())
+        .then(d => {
+          if (d.ok) {
+            if (ipRef.current) ipRef.current.value = '';
+            if (hostRef.current) hostRef.current.value = '';
+            if (domainRef.current) domainRef.current.value = '';
+            if (riskRef.current) riskRef.current.value = '';
+            if (noteRef.current) noteRef.current.value = '';
+            setMsg('');
+            fetchBlacklist();
+          } else {
+            setMsg(d.error || 'Error');
+          }
+        })
+        .catch(() => setMsg('Error de conexión'));
+    }
+
+    function removeEntry(key) {
+      fetch('/api/blacklist/remove', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key }),
+      })
+        .then(r => r.json())
+        .then(d => { if (d.ok) fetchBlacklist(); })
+        .catch(() => {});
+    }
+
+    return (
+      <div className="screen wl-screen">
+        <div className="wl-grid">
+          <section className="card wl-form-card">
+            <div className="card-head"><h3>Agregar entrada</h3></div>
+            {msg && <div className="flash-err">{msg}</div>}
+            <form onSubmit={addEntry} className="wl-form">
+              <label className="field">
+                <span className="field-l">Dirección IP</span>
+                <input ref={ipRef} className="mono" name="ip" placeholder="192.168.1.50" />
+              </label>
+              <label className="field">
+                <span className="field-l">Host</span>
+                <input ref={hostRef} className="mono" name="host" placeholder="malicious.example.com" />
+              </label>
+              <label className="field">
+                <span className="field-l">Dominio</span>
+                <input ref={domainRef} className="mono" name="domain" placeholder="ejemplo.com" />
+              </label>
+              <label className="field">
+                <span className="field-l">Riesgo</span>
+                <input ref={riskRef} name="risk" placeholder="Botnet C2" />
+              </label>
+              <label className="field">
+                <span className="field-l">Nota</span>
+                <input ref={noteRef} name="note" placeholder="Fuente de inteligencia" />
+              </label>
+              <button type="submit" className="btn-primary">Agregar a la lista negra</button>
+            </form>
+          </section>
+
+          <section className="card wl-list-card">
+            <div className="card-head"><h3>Lista Negra</h3><span className="card-tag mono">{entries.length} entradas</span></div>
+            {entries.length ? (
+              <ul className="wl-list">
+                {entries.map((e) => (
+                  <li key={e.key} className="wl-item">
+                    <span className="wl-avatar mono">{(e.ip || e.host || e.domain || '?').slice(0, 2)}</span>
+                    <div className="wl-meta">
+                      <div className="wl-ids mono">
+                        {e.ip && <span className="wl-ip">{e.ip}</span>}
+                        {e.host && <span className="wl-mac">{e.host}</span>}
+                        {e.domain && <span className="wl-mac">{e.domain}</span>}
+                      </div>
+                      {e.risk && <div className="wl-note">Riesgo: {e.risk}</div>}
+                      {e.note && <div className="wl-note">{e.note}</div>}
+                    </div>
+                    <button className="wl-del" title="Eliminar" onClick={() => removeEntry(e.key)}>✕</button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="empty small">No hay entradas en la lista negra.</div>
+            )}
+          </section>
+        </div>
+      </div>
+    );
+  }
 
   /* ============================================================
      APP SHELL
@@ -508,6 +622,7 @@ function Whitelist({ t, lang }) {
     { id: 'alerts', icon: '⚠', key: 'Alertas' },
     { id: 'reports', icon: '≣', key: 'Reportes' },
     { id: 'whitelist', icon: '✓', key: 'Lista Blanca' },
+    { id: 'blacklist', icon: '✕', key: 'Lista Negra' },
   ];
 
   function App() {
@@ -519,6 +634,7 @@ function Whitelist({ t, lang }) {
     const [reports, setReports] = useState(INIT.reports);
     const [alerts, setAlerts] = useState(INIT.alerts);
     const [whitelist, setWhitelist] = useState(INIT.whitelist);
+    const [blacklist, setBlacklist] = useState(INIT.blacklist);
 
     const lastAlertTs = useRef(
       INIT.alerts.reduce((max, a) => Math.max(max, a.timestamp || 0), 0)
@@ -647,6 +763,7 @@ function Whitelist({ t, lang }) {
                 <span className="nav-ic">{n.icon}</span>
                 <span>{n.key}</span>
                 {n.id === 'alerts' && <span className="nav-badge">{alerts.length}</span>}
+                {n.id === 'blacklist' && <span className="nav-badge">{blacklist.length}</span>}
               </button>
             ))}
           </nav>
@@ -681,6 +798,7 @@ function Whitelist({ t, lang }) {
             {screen === 'alerts' && <Alerts t={t} lang={lang} liveTs={liveTs} data={data} onClear={clearAlerts} />}
             {screen === 'reports' && <Reports t={t} lang={lang} liveTs={liveTs} data={data} onClear={clearReports} />}
             {screen === 'whitelist' && <Whitelist />}
+            {screen === 'blacklist' && <Blacklist />}
           </div>
         </main>
       </div>
