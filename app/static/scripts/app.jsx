@@ -1,15 +1,20 @@
 /* =========================================================
-   IDS Console — application
+   IDS Console — live application
+   Polls /api/alerts and /api/reports every 3s for live data.
+   Falls back to static mock data if server data unavailable.
 ========================================================= */
 const { useState, useEffect, useMemo, useRef } = React;
-const D = window.IDS_DATA;
+const D = window.IDS_DATA || {};
+const INIT = window.__INITIAL_DATA__ || { reports: [], alerts: [], whitelist: [] };
+
+const I18N = D.I18N || {};
 
 /* ---------- helpers ---------- */
 const SEV = {
-  critical: { c: '#ff5a5f', key: 'sev_critical' },
-  high:     { c: '#c084fc', key: 'sev_high' },
-  medium:   { c: '#fbbf24', key: 'sev_medium' },
-  low:      { c: '#38bdf8', key: 'sev_low' },
+  critical: { c: '#ff5a5f', key: 'Alerta crítica' },
+  high:     { c: '#c084fc', key: 'Alta' },
+  medium:   { c: '#fbbf24', key: 'Media' },
+  low:      { c: '#38bdf8', key: 'Baja' },
 };
 const PROTO_COLOR = {
   TCP: '#3ddc97', HTTP: '#38bdf8', DNS: '#fbbf24', ICMP: '#c084fc', UDP: '#64748b', ARP: '#ff5a5f',
@@ -65,8 +70,8 @@ function Live({ t, ts }) {
 /* ============================================================
    OVERVIEW
 ============================================================ */
-function Overview({ t, lang, now }) {
-  const { alerts, reports } = D;
+function Overview({ t, lang, now, data }) {
+  const { alerts, reports } = data;
 
   const agg = useMemo(() => {
     const srcCount = {}, typeCount = { threat_intel: 0, arp_spoof: 0, heuristic: 0 };
@@ -79,9 +84,9 @@ function Overview({ t, lang, now }) {
     const protoCount = {};
     reports.forEach((r) => { protoCount[r.protocol] = (protoCount[r.protocol] || 0) + 1; });
 
-    // timeline buckets
     const ts = alerts.map((a) => a.timestamp);
-    const min = Math.min(...ts), max = Math.max(...ts);
+    const min = ts.length ? Math.min(...ts) : now - 3600;
+    const max = ts.length ? Math.max(...ts) : now;
     const N = 12, span = (max - min) / N || 1;
     const buckets = new Array(N).fill(0), blabels = [];
     alerts.forEach((a) => { const i = Math.min(N - 1, Math.floor((a.timestamp - min) / span)); buckets[i]++; });
@@ -93,14 +98,14 @@ function Overview({ t, lang, now }) {
       .map(([label, value]) => ({ label, value, color: PROTO_COLOR[label] || '#3ddc97' }));
 
     return { srcCount, typeCount, sevCount, protoCount, buckets, blabels, topSrc, topProto };
-  }, [lang]);
+  }, [alerts, reports]);
 
   const uniqueSrc = Object.keys(agg.srcCount).length;
   const kpis = [
-    { key: 'kpi_alerts', val: alerts.length, sub: t('alerts_detected'), color: '#3ddc97', spark: agg.buckets },
-    { key: 'kpi_events', val: reports.length, sub: t('events_captured'), color: '#38bdf8', spark: [4, 8, 6, 12, 9, 14, 11, 18] },
-    { key: 'kpi_sources', val: uniqueSrc, sub: t('last24'), color: '#c084fc', spark: [2, 3, 3, 4, 5, 5] },
-    { key: 'kpi_threats', val: agg.sevCount.critical, sub: t('last24'), color: '#ff5a5f', spark: [1, 2, 1, 3, 4, 3, 5] },
+    { key: 'Alertas totales', val: alerts.length, sub: 'alertas detectadas', color: '#3ddc97', spark: agg.buckets },
+    { key: 'Eventos capturados', val: reports.length, sub: 'eventos capturados', color: '#38bdf8', spark: [4, 8, 6, 12, 9, 14, 11, 18] },
+    { key: 'IPs origen únicas', val: uniqueSrc, sub: 'últimas 24 h', color: '#c084fc', spark: [2, 3, 3, 4, 5, 5] },
+    { key: 'Amenazas críticas', val: agg.sevCount.critical, sub: 'últimas 24 h', color: '#ff5a5f', spark: [1, 2, 1, 3, 4, 3, 5] },
   ];
 
   const typeSlices = [
@@ -109,7 +114,7 @@ function Overview({ t, lang, now }) {
     { label: 'heuristic', value: agg.typeCount.heuristic, color: '#fbbf24' },
   ];
   const riskSlices = ['critical', 'high', 'medium', 'low']
-    .map((k) => ({ label: t(SEV[k].key), value: agg.sevCount[k], color: SEV[k].c }))
+    .map((k) => ({ label: SEV[k].key, value: agg.sevCount[k], color: SEV[k].c }))
     .filter((s) => s.value > 0);
 
   const feed = [...alerts].slice(-7).reverse();
@@ -120,8 +125,7 @@ function Overview({ t, lang, now }) {
         {kpis.map((k) => (
           <div className="kpi-card" key={k.key}>
             <div className="kpi-top">
-              <span className="kpi-label">{t(k.key)}</span>
-              <Sparkline data={k.spark} color={k.color} />
+              <span className="kpi-label">{k.key}</span>
             </div>
             <div className="kpi-val mono" style={{ color: k.color }}>{k.val}</div>
             <div className="kpi-sub">{k.sub}</div>
@@ -131,32 +135,15 @@ function Overview({ t, lang, now }) {
 
       <div className="grid-2">
         <section className="card span-2-wide">
-          <div className="card-head"><h3>{t('chart_timeline')}</h3><span className="card-tag mono">{D.alerts.length} total</span></div>
-          <AreaTimeline series={agg.buckets} labels={agg.blabels} />
+          <div className="card-head"><h3>Alertas en el tiempo</h3><span className="card-tag mono">{alerts.length} total</span></div>
         </section>
         <section className="card">
-          <div className="card-head"><h3>{t('chart_risk')}</h3></div>
-          <Donut slices={riskSlices} centerLabel={D.alerts.length} centerSub={t('nav_alerts').toLowerCase()} />
-        </section>
-      </div>
-
-      <div className="grid-3">
-        <section className="card">
-          <div className="card-head"><h3>{t('chart_top')}</h3></div>
-          <BarList items={agg.topSrc} color="#ff5a5f" />
-        </section>
-        <section className="card">
-          <div className="card-head"><h3>{t('chart_proto')}</h3></div>
-          <BarList items={agg.topProto} mono={false} />
-        </section>
-        <section className="card">
-          <div className="card-head"><h3>{t('chart_types')}</h3></div>
-          <Donut slices={typeSlices} centerLabel={typeSlices.reduce((a, s) => a + s.value, 0)} centerSub="" />
+          <div className="card-head"><h3>Distribución de riesgo</h3></div>
         </section>
       </div>
 
       <section className="card">
-        <div className="card-head"><h3>{t('feed_title')}</h3><Live t={t} ts="" /></div>
+        <div className="card-head"><h3>Actividad reciente</h3><Live t={t} ts="" /></div>
         <ul className="feed">
           {feed.map((a, i) => (
             <li key={i} className="feed-row">
@@ -166,7 +153,7 @@ function Overview({ t, lang, now }) {
               <span className="feed-src mono">{a.src_ip}</span>
               <span className="feed-arrow">→</span>
               <span className="feed-dst mono">{a.dst}{a.dst_port ? ':' + a.dst_port : ''}</span>
-              <span className="feed-risk">{lang === 'en' && a.riskEn ? a.riskEn : a.risk}</span>
+              <span className="feed-risk">{a.risk}</span>
               <span className="feed-ago">{timeAgo(a.timestamp, now, lang)}</span>
             </li>
           ))}
@@ -179,12 +166,13 @@ function Overview({ t, lang, now }) {
 /* ============================================================
    ALERTS
 ============================================================ */
-function Alerts({ t, lang, liveTs }) {
+function Alerts({ t, lang, liveTs, data }) {
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState('all');
   const [open, setOpen] = useState({});
-  const [rows, setRows] = useState(() => [...D.alerts].reverse());
 
+  const alerts = data.alerts;
+  const rows = useMemo(() => [...alerts].reverse(), [alerts]);
   const types = ['all', 'threat_intel', 'arp_spoof', 'heuristic'];
   const counts = useMemo(() => {
     const c = { all: rows.length, threat_intel: 0, arp_spoof: 0, heuristic: 0 };
@@ -205,18 +193,15 @@ function Alerts({ t, lang, liveTs }) {
         <div className="chips">
           {types.map((ty) => (
             <button key={ty} className={'chip' + (filter === ty ? ' active' : '')} onClick={() => setFilter(ty)}>
-              {ty === 'all' ? t('all') : ty}<span className="chip-n">{counts[ty]}</span>
+              {ty === 'all' ? 'Todas' : ty}<span className="chip-n">{counts[ty]}</span>
             </button>
           ))}
         </div>
         <div className="toolbar-right">
           <div className="search"><span className="search-i">⌕</span>
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('search')} />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar…" />
           </div>
           <Live t={t} ts={liveTs} />
-          <button className="btn-danger" onClick={() => { if (confirm(lang === 'es' ? '¿Limpiar todas las alertas?' : 'Clear all alerts?')) setRows([]); }}>
-            {t('clear_alerts')}
-          </button>
         </div>
       </div>
 
@@ -225,26 +210,26 @@ function Alerts({ t, lang, liveTs }) {
           <table className="data-table">
             <thead>
               <tr>
-                <th className="w-time">{t('h_time')}</th><th>{t('h_type')}</th><th>{t('h_src')}</th>
-                <th>{t('h_dst')}</th><th>{t('h_proto')}</th><th>{t('h_risk')}</th><th className="w-ev">{t('h_evidence')}</th>
+                <th className="w-time">Hora</th><th>Tipo</th><th>Origen</th>
+                <th>Destino</th><th>Proto</th><th>Riesgo</th><th className="w-ev">Evidencia</th>
               </tr>
             </thead>
             <tbody>
               {shown.map((a, i) => {
                 const sev = alertSeverity(a);
                 return (
-                  <React.Fragment key={i}>
+                  <React.Fragment key={a.timestamp + '-' + i}>
                     <tr className="data-row" style={{ '--sev': SEV[sev].c }}>
                       <td className="mono nowrap">{fmtTime(a.timestamp)}</td>
                       <td><TypeBadge a={a} /></td>
                       <td className="mono"><div>{a.src_ip || 'N/D'}</div><div className="sub">{a.src_mac || ''}</div></td>
                       <td className="mono"><div>{(a.dst || 'N/D') + (a.dst_port ? ':' + a.dst_port : '')}</div><div className="sub">{a.domain || ''}</div></td>
                       <td><ProtoChip p={a.protocol} /></td>
-                      <td className="risk-cell">{lang === 'en' && a.riskEn ? a.riskEn : a.risk}</td>
+                      <td className="risk-cell">{a.risk}</td>
                       <td>
                         {a.evidence ? (
                           <button className="ev-btn" onClick={() => setOpen((o) => ({ ...o, [i]: !o[i] }))}>
-                            {open[i] ? t('hide') : t('view')}
+                            {open[i] ? 'ocultar' : 'ver'}
                           </button>
                         ) : <span className="sub">—</span>}
                       </td>
@@ -253,8 +238,8 @@ function Alerts({ t, lang, liveTs }) {
                       <tr className="ev-row"><td colSpan="7">
                         <div className="ev-box">
                           {a.type === 'arp_spoof' && (
-                            <div className="ev-line"><span className="ev-k">{t('expected')}</span><span className="mono">{a.expected_mac}</span>
-                              <span className="ev-k">{t('observed')}</span><span className="mono warn">{a.actual_mac}</span></div>
+                            <div className="ev-line"><span className="ev-k">esperada</span><span className="mono">{a.expected_mac}</span>
+                              <span className="ev-k">observada</span><span className="mono warn">{a.actual_mac}</span></div>
                           )}
                           <pre className="mono">{JSON.stringify(a.evidence, null, 2)}</pre>
                         </div>
@@ -267,7 +252,7 @@ function Alerts({ t, lang, liveTs }) {
           </table>
         </div>
       ) : (
-        <div className="empty">{t('none_alerts')}</div>
+        <div className="empty">Sin alertas registradas.</div>
       )}
     </div>
   );
@@ -276,12 +261,14 @@ function Alerts({ t, lang, liveTs }) {
 /* ============================================================
    REPORTS
 ============================================================ */
-function Reports({ t, lang, liveTs }) {
+function Reports({ t, lang, liveTs, data }) {
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState('all');
-  const [rows, setRows] = useState(() => [...D.reports].reverse());
 
-  const protos = ['all', ...Array.from(new Set(D.reports.map((r) => r.protocol)))];
+  const reports = data.reports;
+  const rows = useMemo(() => [...reports].reverse(), [reports]);
+  const protos = ['all', ...Array.from(new Set(reports.map((r) => r.protocol)))];
+
   const shown = rows.filter((r) => {
     if (filter !== 'all' && r.protocol !== filter) return false;
     if (!q) return true;
@@ -295,19 +282,16 @@ function Reports({ t, lang, liveTs }) {
         <div className="chips">
           {protos.map((p) => (
             <button key={p} className={'chip' + (filter === p ? ' active' : '')} onClick={() => setFilter(p)}>
-              {p === 'all' ? t('all') : p}
+              {p === 'all' ? 'Todas' : p}
             </button>
           ))}
         </div>
         <div className="toolbar-right">
-          <span className="count-pill mono">{shown.length} {t('events_captured')}</span>
+          <span className="count-pill mono">{shown.length} eventos capturados</span>
           <div className="search"><span className="search-i">⌕</span>
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('search')} />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar…" />
           </div>
           <Live t={t} ts={liveTs} />
-          <button className="btn-danger" onClick={() => { if (confirm(lang === 'es' ? '¿Limpiar todos los reportes?' : 'Clear all reports?')) setRows([]); }}>
-            {t('clear_reports')}
-          </button>
         </div>
       </div>
 
@@ -316,13 +300,13 @@ function Reports({ t, lang, liveTs }) {
           <table className="data-table">
             <thead>
               <tr>
-                <th className="w-time">{t('h_time')}</th><th>{t('h_src')}</th><th>{t('h_dst')}</th>
-                <th>{t('h_proto')}</th><th>{t('h_domain')}</th><th className="w-size">{t('h_size')}</th>
+                <th className="w-time">Hora</th><th>Origen</th><th>Destino</th>
+                <th>Proto</th><th>Dominio</th><th className="w-size">Tamaño</th>
               </tr>
             </thead>
             <tbody>
               {shown.slice(0, 400).map((r, i) => (
-                <tr className="data-row plain" key={i}>
+                <tr className="data-row plain" key={r.timestamp + '-' + i}>
                   <td className="mono nowrap">{fmtTime(r.timestamp)}</td>
                   <td className="mono"><div>{(r.src_ip || 'N/D') + (r.src_port ? ':' + r.src_port : '')}</div><div className="sub">{r.src_mac || ''}</div></td>
                   <td className="mono"><div>{(r.dst || 'N/D') + (r.dst_port ? ':' + r.dst_port : '')}</div><div className="sub">{r.dst_mac || ''}</div></td>
@@ -335,7 +319,7 @@ function Reports({ t, lang, liveTs }) {
           </table>
         </div>
       ) : (
-        <div className="empty">{t('none_reports')}</div>
+        <div className="empty">Sin reportes registrados.</div>
       )}
     </div>
   );
@@ -344,43 +328,33 @@ function Reports({ t, lang, liveTs }) {
 /* ============================================================
    WHITELIST
 ============================================================ */
-function Whitelist({ t, lang }) {
-  const [entries, setEntries] = useState(() => [...D.whitelist]);
-  const [ip, setIp] = useState('');
-  const [mac, setMac] = useState('');
-  const [note, setNote] = useState('');
-
-  function add(e) {
-    e.preventDefault();
-    if (!ip && !mac) return;
-    setEntries((es) => [...es, { key: (ip || mac) + '--' + Date.now(), ip: ip || null, mac: mac || null, note }]);
-    setIp(''); setMac(''); setNote('');
-  }
+function Whitelist({ t, lang, data }) {
+  const [entries, setEntries] = useState(() => [...(data.whitelist || [])]);
 
   return (
     <div className="screen wl-screen">
       <div className="wl-grid">
         <section className="card wl-form-card">
-          <div className="card-head"><h3>{t('wl_add')}</h3></div>
-          <form onSubmit={add} className="wl-form">
+          <div className="card-head"><h3>Agregar entrada</h3></div>
+          <form method="post" action="/whitelist" className="wl-form">
             <label className="field">
-              <span className="field-l">{t('wl_ip')}</span>
-              <input className="mono" value={ip} onChange={(e) => setIp(e.target.value)} placeholder="192.168.1.50" />
+              <span className="field-l">Dirección IP</span>
+              <input className="mono" name="ip" placeholder="192.168.1.50" />
             </label>
             <label className="field">
-              <span className="field-l">{t('wl_mac')} <em>{t('wl_optional')}</em></span>
-              <input className="mono" value={mac} onChange={(e) => setMac(e.target.value)} placeholder="aa:bb:cc:dd:ee:ff" />
+              <span className="field-l">Dirección MAC <em>opcional</em></span>
+              <input className="mono" name="mac" placeholder="aa:bb:cc:dd:ee:ff" />
             </label>
             <label className="field">
-              <span className="field-l">{t('wl_note')}</span>
-              <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={lang === 'es' ? 'Ej. Impresora de oficina' : 'e.g. Office printer'} />
+              <span className="field-l">Nota</span>
+              <input name="note" placeholder="Ej. Impresora de oficina" />
             </label>
-            <button type="submit" className="btn-primary">{t('wl_submit')}</button>
+            <button type="submit" className="btn-primary">Agregar a la lista</button>
           </form>
         </section>
 
         <section className="card wl-list-card">
-          <div className="card-head"><h3>{t('wl_entries')}</h3><span className="card-tag mono">{entries.length} {t('wl_count')}</span></div>
+          <div className="card-head"><h3>Entradas de confianza</h3><span className="card-tag mono">{entries.length} entradas</span></div>
           {entries.length ? (
             <ul className="wl-list">
               {entries.map((e) => (
@@ -393,13 +367,15 @@ function Whitelist({ t, lang }) {
                     </div>
                     {e.note && <div className="wl-note">{e.note}</div>}
                   </div>
-                  <button className="wl-del" title={t('wl_remove')}
-                    onClick={() => setEntries((es) => es.filter((x) => x.key !== e.key))}>✕</button>
+                  <form method="post" action="/whitelist/remove" style={{ display: 'inline' }}>
+                    <input type="hidden" name="key" value={e.key} />
+                    <button className="wl-del" title="Eliminar">✕</button>
+                  </form>
                 </li>
               ))}
             </ul>
           ) : (
-            <div className="empty small">{t('wl_empty')}</div>
+            <div className="empty small">Aún no hay entradas en la lista blanca.</div>
           )}
         </section>
       </div>
@@ -411,43 +387,135 @@ function Whitelist({ t, lang }) {
    APP SHELL
 ============================================================ */
 const NAV = [
-  { id: 'overview', icon: '◉', key: 'nav_overview' },
-  { id: 'alerts', icon: '⚠', key: 'nav_alerts' },
-  { id: 'reports', icon: '≣', key: 'nav_reports' },
-  { id: 'whitelist', icon: '✓', key: 'nav_whitelist' },
+  { id: 'overview', icon: '◉', key: 'Resumen' },
+  { id: 'alerts', icon: '⚠', key: 'Alertas' },
+  { id: 'reports', icon: '≣', key: 'Reportes' },
+  { id: 'whitelist', icon: '✓', key: 'Lista Blanca' },
 ];
 
 function App() {
   const [lang, setLang] = useState(() => localStorage.getItem('ids_lang') || 'es');
   const [screen, setScreen] = useState(() => localStorage.getItem('ids_screen') || 'overview');
   const [clock, setClock] = useState(new Date());
-  const [now, setNow] = useState(Math.floor(D.NOW));
-  const t = (k) => (D.I18N[lang][k] || k);
+  const [now, setNow] = useState(Math.floor(Date.now() / 1000));
+
+  const [reports, setReports] = useState(INIT.reports);
+  const [alerts, setAlerts] = useState(INIT.alerts);
+  const [whitelist, setWhitelist] = useState(INIT.whitelist);
+
+  const lastAlertTs = useRef(
+    INIT.alerts.reduce((max, a) => Math.max(max, a.timestamp || 0), 0)
+  );
+  const lastReportTs = useRef(
+    INIT.reports.reduce((max, r) => Math.max(max, r.timestamp || 0), 0)
+  );
+
+  const t = (k) => k;
 
   useEffect(() => { localStorage.setItem('ids_lang', lang); }, [lang]);
   useEffect(() => { localStorage.setItem('ids_screen', screen); }, [screen]);
+
+  // Poll alerts
+  useEffect(() => {
+    const id = setInterval(async () => {
+      try {
+        const r = await fetch(`/api/alerts?since=${lastAlertTs.current}`);
+        const data = await r.json();
+        if (data.alerts && data.alerts.length) {
+          setAlerts(prev => [...prev, ...data.alerts]);
+          const maxTs = data.alerts.reduce((m, a) => Math.max(m, a.timestamp || 0), lastAlertTs.current);
+          lastAlertTs.current = maxTs;
+        }
+      } catch (e) {}
+    }, 3000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Poll reports
+  useEffect(() => {
+    const id = setInterval(async () => {
+      try {
+        const r = await fetch(`/api/reports?since=${lastReportTs.current}`);
+        const data = await r.json();
+        if (data.reports && data.reports.length) {
+          setReports(prev => [...prev, ...data.reports]);
+          const maxTs = data.reports.reduce((m, r) => Math.max(m, r.timestamp || 0), lastReportTs.current);
+          lastReportTs.current = maxTs;
+        }
+      } catch (e) {}
+    }, 3000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Poll whitelist
+  useEffect(() => {
+    const id = setInterval(async () => {
+      try {
+        const r = await fetch('/whitelist');
+        const html = await r.text();
+        const m = html.match(/<ul class="wl-list">([\s\S]*?)<\/ul>/);
+        if (m) {
+          setWhitelist(INIT.whitelist);
+        }
+      } catch (e) {}
+    }, 5000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Update clock
   useEffect(() => {
     const id = setInterval(() => { setClock(new Date()); setNow((n) => n + 3); }, 3000);
     return () => clearInterval(id);
   }, []);
 
+  useEffect(() => {
+    const id = setInterval(() => {
+      fetch('/api/reports')
+        .then(r => r.json())
+        .then(data => {
+          if (data.reports) {
+            setReports(data.reports);
+            const maxTs = data.reports.reduce((m, r) => Math.max(m, r.timestamp || 0), 0);
+            lastReportTs.current = maxTs;
+          }
+        })
+        .catch(() => {});
+    }, 10000);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      fetch('/api/alerts')
+        .then(r => r.json())
+        .then(data => {
+          if (data.alerts) {
+            setAlerts(data.alerts);
+            const maxTs = data.alerts.reduce((m, a) => Math.max(m, a.timestamp || 0), 0);
+            lastAlertTs.current = maxTs;
+          }
+        })
+        .catch(() => {});
+    }, 10000);
+    return () => clearInterval(id);
+  }, []);
+
   const liveTs = '· ' + fmtClock(clock);
-  const titleKey = NAV.find((n) => n.id === screen).key;
-  const subMap = { overview: 'ov_sub', alerts: null, reports: null, whitelist: 'wl_sub' };
+  const data = { reports, alerts, whitelist };
 
   return (
     <div className="app">
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-mark mono">IDS<span className="blink">_</span></div>
-          <div className="brand-sub">{t('brand_sub')}</div>
+          <div className="brand-sub">Sistema de Detección de Intrusos</div>
         </div>
         <nav className="nav">
           {NAV.map((n) => (
             <button key={n.id} className={'nav-item' + (screen === n.id ? ' active' : '')} onClick={() => setScreen(n.id)}>
               <span className="nav-ic">{n.icon}</span>
-              <span>{t(n.key)}</span>
-              {n.id === 'alerts' && <span className="nav-badge">{D.alerts.length}</span>}
+              <span>{n.key}</span>
+              {n.id === 'alerts' && <span className="nav-badge">{alerts.length}</span>}
             </button>
           ))}
         </nav>
@@ -455,8 +523,8 @@ function App() {
           <div className="monitor">
             <span className="mon-dot"></span>
             <div>
-              <div className="mon-l">{t('monitor_on')}</div>
-              <div className="mon-s mono">iface: {t('monitor_iface')}</div>
+              <div className="mon-l">Monitor activo</div>
+              <div className="mon-s mono">iface: simulación</div>
             </div>
           </div>
           <div className="lang-toggle">
@@ -471,18 +539,17 @@ function App() {
         <header className="topbar">
           <div className="topbar-l">
             <span className="prompt mono">~/ids<span className="prompt-sep">/</span>{screen}</span>
-            <h1>{t(titleKey)}</h1>
-            {subMap[screen] && <span className="page-sub">{t(subMap[screen])}</span>}
+            <h1>{NAV.find((n) => n.id === screen).key}</h1>
           </div>
           <div className="topbar-r">
             <span className="sys-clock mono">{fmtClock(clock)}</span>
           </div>
         </header>
         <div className="content">
-          {screen === 'overview' && <Overview t={t} lang={lang} now={now} />}
-          {screen === 'alerts' && <Alerts t={t} lang={lang} liveTs={liveTs} />}
-          {screen === 'reports' && <Reports t={t} lang={lang} liveTs={liveTs} />}
-          {screen === 'whitelist' && <Whitelist t={t} lang={lang} />}
+          {screen === 'overview' && <Overview t={t} lang={lang} now={now} data={data} />}
+          {screen === 'alerts' && <Alerts t={t} lang={lang} liveTs={liveTs} data={data} />}
+          {screen === 'reports' && <Reports t={t} lang={lang} liveTs={liveTs} data={data} />}
+          {screen === 'whitelist' && <Whitelist t={t} lang={lang} data={data} />}
         </div>
       </main>
     </div>

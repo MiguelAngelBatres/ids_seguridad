@@ -375,8 +375,22 @@ def monitor_loop(stop_after=None, use_scapy=False, iface=None, bpf_filter=None):
         promisc = os.getenv('SCAPY_PROMISC', '1').lower() in ('1', 'true', 'yes')
         if promisc:
             print('Captura en modo promiscuo (escucha todo el trafico del segmento)')
-        sniff(prn=_pkt_cb, iface=iface, filter=capture_filter, store=False, promisc=promisc)
-        return
+        try:
+            sniff(prn=_pkt_cb, iface=iface, filter=capture_filter, store=False, promisc=promisc)
+        except PermissionError:
+            print('ERROR: No tienes permisos para capturar paquetes.')
+            print('  Ejecuta con sudo: SCAPY_ENABLE=1 sudo -E python -m app.main')
+            print('  O concede permiso: sudo setcap cap_net_raw+eip "$(which python3)"')
+            print('  O usa SCAPY_ENABLE=0 para modo simulación.')
+        except OSError as e:
+            print(f'ERROR de captura ({e.errno}): {e.strerror}')
+            print(f'  Interfaz: {iface or "(auto)"} | Filtro: {capture_filter}')
+            print('  Verifica que la interfaz existe y tiene tráfico.')
+        except Exception as e:
+            print(f'ERROR inesperado en captura scapy: {type(e).__name__}: {e}')
+            print('  Cambiando a modo simulación automáticamente.')
+        else:
+            return
 
     print('Modo simulación: generando eventos de ejemplo (use SCAPY_ENABLE=1 para captura real)')
     counter = 0
