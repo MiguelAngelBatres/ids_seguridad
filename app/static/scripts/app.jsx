@@ -384,6 +384,8 @@ function Reports({ t, lang, liveTs, data, onClear }) {
         <div className="empty">Sin reportes registrados.</div>
       )}
     </div>
+  );
+}
 /* ============================================================
    WHITELIST
 ============================================================ */
@@ -459,7 +461,6 @@ function Whitelist({ t, lang }) {
                 <span className="field-l">Nota</span>
                 <input ref={noteRef} name="note" placeholder="Ej. Impresora de oficina" />
               </label>
-              {error && <div style={{ color: 'var(--red)', fontSize: '12px' }}>{error}</div>}
               <button type="submit" className="btn-primary">Agregar a la lista</button>
             </form>
           </section>
