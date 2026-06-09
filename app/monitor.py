@@ -66,7 +66,7 @@ _monitor_thread = None
 _monitor_lock = threading.Lock()
 
 _DATA_LOCK = threading.Lock()
-_MAX_EVENTS = 10000
+_MAX_EVENTS = 1000
 
 def _rebuild_blacklist_sets(blacklist):
     ips = set()
@@ -160,16 +160,25 @@ def _update_external_blacklist():
                 print(f"Error descargando CINS Army: {e}")
 
             if new_entries:
-                ips, domains = _rebuild_blacklist_sets(new_entries)
                 with _DATA_LOCK:
-                    _STATE['blacklist'] = new_entries
+                    # Conservar las entradas manuales del usuario
+                    custom_entries = [
+                        e for e in _STATE['blacklist'] 
+                        if e.get('note') not in ('Abuse.ch Feodo Tracker', 'CINS Army')
+                    ]
+                    
+                    combined_entries = custom_entries + new_entries
+                    ips, domains = _rebuild_blacklist_sets(combined_entries)
+                    
+                    _STATE['blacklist'] = combined_entries
                     _STATE['blacklist_ips'] = ips
                     _STATE['blacklist_domains'] = domains
+                    
                 try:
-                    save_json(BLACKLIST_FILE, new_entries)
+                    save_json(BLACKLIST_FILE, combined_entries)
                 except Exception as e:
                     print(f"Error guardando blacklist: {e}")
-                print(f"Lista negra actualizada: {len(new_entries)} entradas.")
+                print(f"Lista negra actualizada: {len(combined_entries)} entradas (incluyendo {len(custom_entries)} manuales).")
 
         except Exception as e:
             print(f"Error general en la actualizacion de la lista negra: {e}")
@@ -271,10 +280,13 @@ def get_reports_since(since_ts):
         return [r for r in _STATE['reports'] if int(r.get('timestamp', 0) or 0) > since_ts]
 
 
-def clear_alerts():
+def clear_alerts(type_filter=None):
     global _NEEDS_FLUSH
     with _DATA_LOCK:
-        _STATE['alerts'] = []
+        if type_filter:
+            _STATE['alerts'] = [a for a in _STATE['alerts'] if a.get('type') != type_filter]
+        else:
+            _STATE['alerts'] = []
         _NEEDS_FLUSH = True
 
 
@@ -283,10 +295,13 @@ def _clear_file(filepath):
         save_json(filepath, [])
 
 
-def clear_reports():
+def clear_reports(proto_filter=None):
     global _NEEDS_FLUSH
     with _DATA_LOCK:
-        _STATE['reports'] = []
+        if proto_filter:
+            _STATE['reports'] = [r for r in _STATE['reports'] if r.get('protocol') != proto_filter]
+        else:
+            _STATE['reports'] = []
         _NEEDS_FLUSH = True
 
 
@@ -340,7 +355,20 @@ def _persist_alert(alert):
     with _DATA_LOCK:
         _STATE['alerts'].append(alert)
         if len(_STATE['alerts']) > _MAX_EVENTS:
-            _STATE['alerts'] = _STATE['alerts'][-_MAX_EVENTS:]
+            drop_count = len(_STATE['alerts']) - _MAX_EVENTS
+            new_alerts = []
+            dropped = 0
+            
+            for a in _STATE['alerts']:
+                if dropped < drop_count and a.get('type') == 'unauthorized_device':
+                    dropped += 1
+                else:
+                    new_alerts.append(a)
+                    
+            if len(new_alerts) > _MAX_EVENTS:
+                new_alerts = new_alerts[-_MAX_EVENTS:]
+                
+            _STATE['alerts'] = new_alerts
         _NEEDS_FLUSH = True
 
 

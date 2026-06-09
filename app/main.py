@@ -46,13 +46,17 @@ def legacy_style():
 
 @app.route('/api/alerts/clear', methods=['POST'])
 def api_alerts_clear():
-    clear_alerts()
+    data = request.get_json(silent=True) or {}
+    type_filter = data.get('type')
+    clear_alerts(type_filter)
     return jsonify({'success': True})
 
 
 @app.route('/api/reports/clear', methods=['POST'])
 def api_reports_clear():
-    clear_reports()
+    data = request.get_json(silent=True) or {}
+    proto_filter = data.get('protocol')
+    clear_reports(proto_filter)
     return jsonify({'success': True})
 
 
