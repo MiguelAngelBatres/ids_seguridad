@@ -611,12 +611,6 @@ function Whitelist({ t, lang }) {
     );
   }
 
-  /* ============================================================
-    BLACKLIST
-  ============================================================ */
-  const [screen, setScreen] = useState('overview');
-  const [wl, setWl] = useState(() => [...D.whitelist]);
-  const [bl, setBl] = useState(() => [...D.blacklist]); // <-- Nuevo estado para Blacklist
 
 
   /* ============================================================
