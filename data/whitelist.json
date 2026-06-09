@@ -1,26 +1,20 @@
 [
   {
-    "key": "10.13.140.32--1781029417",
-    "ip": "10.13.140.32",
+    "key": "10.13.0.0_16_subnet",
+    "ip": "10.13.0.0/16",
     "mac": null,
-    "note": "Host local"
+    "note": "Subred local 10.13"
   },
   {
-    "key": "10.13.144.32--1781030044",
-    "ip": "10.13.144.32",
+    "key": "192.168.1.0_24_subnet",
+    "ip": "192.168.1.0/24",
     "mac": null,
-    "note": "Mi computadora"
+    "note": "Subred local 192.168.1"
   },
   {
-    "key": "192.168.1.39--1781030044",
-    "ip": "192.168.1.39",
-    "mac": null,
-    "note": "Mi computadora en la casa"
-  },
-  {
-    "key": "192.168.1.1--1781030044",
-    "ip": "192.168.1.1",
-    "mac": null,
-    "note": "Router/gateway de la casa"
+    "key": "192.168.127.254",
+    "ip": "192.168.127.254",
+    "mac": "ca:66:5d:f0:fd:8a",
+    "note": "Gateway"
   }
 ]

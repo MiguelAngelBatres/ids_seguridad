@@ -480,6 +480,8 @@ def _handle_event(event):
         }
         _emit_alert(alert)
 
+    # El motor heurístico siempre debe analizar el tráfico local (whitelisted o no)
+    if _is_local(event.get('src_ip')):
         for alert in get_engine().analyze(event):
             _emit_alert(alert)
 
