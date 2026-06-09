@@ -277,7 +277,7 @@ def _tcp_flags(pkt):
 
 
 def _proto_name(num):
-    return {1: 'ICMP', 6: 'TCP', 17: 'UDP'}.get(num)
+    return {1: 'ICMP', 2: 'IGMP', 6: 'TCP', 17: 'UDP', 41: 'IPv6', 47: 'GRE', 50: 'ESP', 51: 'AH', 58: 'ICMPv6', 89: 'OSPF', 132: 'SCTP'}.get(num)
 
 
 def _dns_name(pkt, dns_layer):
@@ -396,17 +396,26 @@ def monitor_loop(stop_after=None, use_scapy=False, iface=None, bpf_filter=None):
     print('Modo simulación: generando eventos de ejemplo (use SCAPY_ENABLE=1 para captura real)')
     counter = 0
     import random
-    protocols = ['HTTP', 'DNS', 'ICMP', 'TCP']
-    ports = [80, 443, 53, 22, 3389, 8080, 3306, 0]
+    protocols = ['HTTP', 'DNS', 'ICMP', 'TCP', 'UDP']
+    tcp_ports = [80, 443, 22, 3389, 8080, 3306]
+    udp_ports = [123, 161, 514, 1194, 5353, 4500]
     while True:
         proto = random.choice(protocols)
+        if proto in ('HTTP', 'TCP'):
+            dst_port = random.choice(tcp_ports)
+        elif proto == 'DNS':
+            dst_port = 53
+        elif proto == 'UDP':
+            dst_port = random.choice(udp_ports)
+        else:
+            dst_port = None
         fake_event = {
             'timestamp': int(time.time()),
             'src_ip': '192.0.2.10',
             'src_mac': 'aa:bb:cc:dd:ee:ff',
             'src_port': random.randint(1024, 65535),
             'dst': '203.0.113.66',
-            'dst_port': random.choice(ports) if proto in ('HTTP', 'TCP') else None,
+            'dst_port': dst_port,
             'dst_mac': '00:11:22:33:44:55',
             'domain': 'malicious.example' if proto == 'HTTP' else None,
             'protocol': proto,

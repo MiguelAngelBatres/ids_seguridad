@@ -42,6 +42,47 @@ function timeAgo(ts, now, lang) {
 function alertSeverity(a) { return a.severity || (a.type === 'threat_intel' ? 'critical' : a.type === 'arp_spoof' ? 'high' : 'medium'); }
 function alertLabel(a) { return a.type === 'heuristic' ? (a.subtype || 'heuristic') : a.type; }
 
+function wiresharkFilter(r) {
+  const parts = [];
+  if (r.src_ip && r.dst) parts.push(`ip.addr == ${r.src_ip} && ip.addr == ${r.dst}`);
+  else if (r.src_ip) parts.push(`ip.addr == ${r.src_ip}`);
+  else if (r.dst) parts.push(`ip.addr == ${r.dst}`);
+  const proto = (r.protocol || '').toUpperCase();
+  if (proto === 'TCP' || proto === 'HTTP') {
+    if (r.dst_port) parts.push(`tcp.port == ${r.dst_port}`);
+  } else if (proto === 'UDP') {
+    if (r.dst_port) parts.push(`udp.port == ${r.dst_port}`);
+  } else if (proto === 'DNS') {
+    parts.push('dns');
+    if (r.domain) parts.push(`dns.qry.name == "${r.domain}"`);
+  } else if (proto === 'ICMP') {
+    parts.push('icmp');
+  } else if (proto === 'ARP') {
+    parts.push('arp');
+    if (r.src_ip) parts.push(`arp.src.proto_ipv4 == ${r.src_ip}`);
+  } else if (proto === 'IGMP') {
+    parts.push('igmp');
+  }
+  if (r.src_mac) parts.push(`eth.addr == ${r.src_mac}`);
+  return parts.join(' && ') || 'ip';
+}
+
+function CopyWsBtn({ r }) {
+  const [copied, setCopied] = useState(false);
+  const f = wiresharkFilter(r);
+  const copy = () => {
+    navigator.clipboard.writeText(f).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
+  return (
+    <button className="ws-btn" title={f} onClick={copy}>
+      {copied ? '✓' : '🦈'}
+    </button>
+  );
+}
+
 /* ---------- small UI atoms ---------- */
 function TypeBadge({ a }) {
   const sev = alertSeverity(a);
@@ -74,7 +115,7 @@ function Overview({ t, lang, now, data }) {
   const { alerts, reports } = data;
 
   const agg = useMemo(() => {
-    const srcCount = {}, typeCount = { threat_intel: 0, arp_spoof: 0, heuristic: 0 };
+    const srcCount = {}, typeCount = { unauthorized_device: 0, threat_intel: 0, arp_spoof: 0, heuristic: 0 };
     const sevCount = { critical: 0, high: 0, medium: 0, low: 0 };
     alerts.forEach((a) => {
       srcCount[a.src_ip] = (srcCount[a.src_ip] || 0) + 1;
@@ -139,6 +180,19 @@ function Overview({ t, lang, now, data }) {
         </section>
         <section className="card">
           <div className="card-head"><h3>Distribución de riesgo</h3></div>
+          {riskSlices.length ? (
+            <ul className="legend">
+              {riskSlices.map((s) => (
+                <li key={s.label}>
+                  <span className="dot" style={{ background: s.color }}></span>
+                  <span className="lg-label">{s.label}</span>
+                  <span className="lg-val">{s.value}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="empty small">Sin alertas de riesgo aún</div>
+          )}
         </section>
       </div>
 
@@ -173,9 +227,9 @@ function Alerts({ t, lang, liveTs, data, onClear }) {
 
   const alerts = data.alerts;
   const rows = useMemo(() => [...alerts].reverse(), [alerts]);
-  const types = ['all', 'threat_intel', 'arp_spoof', 'heuristic'];
+  const types = ['all', 'unauthorized_device', 'threat_intel', 'arp_spoof', 'heuristic'];
   const counts = useMemo(() => {
-    const c = { all: rows.length, threat_intel: 0, arp_spoof: 0, heuristic: 0 };
+    const c = { all: rows.length, unauthorized_device: 0, threat_intel: 0, arp_spoof: 0, heuristic: 0 };
     rows.forEach((a) => { c[a.type]++; });
     return c;
   }, [rows]);
@@ -307,7 +361,7 @@ function Reports({ t, lang, liveTs, data, onClear }) {
             <thead>
               <tr>
                 <th className="w-time">Hora</th><th>Origen</th><th>Destino</th>
-                <th>Proto</th><th>Dominio</th><th className="w-size">Tamaño</th>
+                <th>Proto</th><th>Dominio</th><th className="w-size">Tamaño</th><th className="w-ws">Wireshark</th>
               </tr>
             </thead>
             <tbody>
@@ -319,6 +373,7 @@ function Reports({ t, lang, liveTs, data, onClear }) {
                   <td><ProtoChip p={r.protocol} />{r.tcp_flags ? <span className="flags mono">{r.tcp_flags}</span> : null}</td>
                   <td className="mono dim">{r.domain || ''}</td>
                   <td className="mono nowrap">{r.size != null ? r.size + ' B' : ''}</td>
+                  <td className="ws-cell"><CopyWsBtn r={r} /></td>
                 </tr>
               ))}
             </tbody>

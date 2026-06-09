@@ -1,2 +1,5 @@
 .env
-.env
+app/__pycache__/
+*.pyc
+data/alerts.json
+data/reports.json
