@@ -244,11 +244,6 @@ def clear_alerts():
         _NEEDS_FLUSH = True
 
 
-def _clear_file(filepath):
-    with _reports_lock:
-        save_json(filepath, [])
-
-
 def clear_reports():
     global _NEEDS_FLUSH
     with _DATA_LOCK:

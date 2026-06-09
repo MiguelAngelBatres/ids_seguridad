@@ -4,5 +4,23 @@
     "ip": "10.13.140.32",
     "mac": null,
     "note": "Host local"
+  },
+  {
+    "key": "10.13.144.32--1781030044",
+    "ip": "10.13.144.32",
+    "mac": null,
+    "note": "Mi computadora"
+  },
+  {
+    "key": "192.168.1.39--1781030044",
+    "ip": "192.168.1.39",
+    "mac": null,
+    "note": "Mi computadora en la casa"
+  },
+  {
+    "key": "192.168.1.1--1781030044",
+    "ip": "192.168.1.1",
+    "mac": null,
+    "note": "Router/gateway de la casa"
   }
 ]
