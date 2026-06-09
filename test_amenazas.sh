@@ -15,9 +15,12 @@ set -e
 IDS_IP="10.13.60.199"
 
 # --- IPs de la blacklist del IDS ---
-# El IDS tiene estas IPs marcadas como peligrosas.
-# Cualquier conexión hacia ellas dispara una alerta "threat_intel" (crítica).
-BLACKLIST_IP1="45.33.32.156"    # scanme.nmap.org (IP pública de prueba de Nmap)
+# Extraemos dinámicamente la primera IP de la lista negra actualizada de internet
+BLACKLIST_IP1=$(grep -o '"ip": "[0-9\.]*"' data/blacklist.json 2>/dev/null | head -n 1 | cut -d '"' -f 4)
+
+if [ -z "$BLACKLIST_IP1" ]; then
+    BLACKLIST_IP1="45.33.32.156" # Fallback
+fi
 BLACKLIST_IP2="198.51.100.77"   # IP ficticia de ejemplo
 
 echo "=========================================="
@@ -30,7 +33,7 @@ echo ""
 #     Dispara: threat_intel + consulta Whois automática
 # ----------------------------------------------------------
 echo "[1/4] Generando conexiones a IP en lista negra (threat_intel)..."
-echo "      Destino: $BLACKLIST_IP1 (scanme.nmap.org)"
+echo "      Destino: $BLACKLIST_IP1"
 
 # Intentar conectar por varios puertos a la IP blacklisteada
 for port in 80 443 22 8080; do
@@ -40,9 +43,9 @@ for port in 80 443 22 8080; do
 done
 
 # También hacer consultas DNS a un dominio en la blacklist
-echo "  -> Consultando DNS de scanme.nmap.org ..."
-nslookup scanme.nmap.org >/dev/null 2>&1 || true
-dig scanme.nmap.org +short >/dev/null 2>&1 || true
+echo "  -> Consultando DNS de un dominio bloqueado ..."
+nslookup malicious-domain.com >/dev/null 2>&1 || true
+dig malicious-domain.com +short >/dev/null 2>&1 || true
 
 echo "  ✓ Conexiones a IP peligrosa completadas"
 echo ""

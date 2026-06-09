@@ -311,6 +311,13 @@ def _send_email_async(alert, with_whois=False):
         if with_whois:
             target = alert.get('dst') or alert.get('domain')
             whois_result = query_whois(target) if target else None
+            if whois_result and whois_result.get('abuse_contacts'):
+                with _DATA_LOCK:
+                    if 'evidence' not in alert:
+                        alert['evidence'] = {}
+                    alert['evidence']['abuse_contacts'] = whois_result['abuse_contacts']
+                    global _NEEDS_FLUSH
+                    _NEEDS_FLUSH = True
         try:
             send_alert_email(alert, whois_result)
         except Exception as e:
