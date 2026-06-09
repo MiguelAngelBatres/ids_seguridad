@@ -12,9 +12,9 @@ const I18N = D.I18N || {};
 /* ---------- helpers ---------- */
 const SEV = {
   critical: { c: '#ff5a5f', key: 'Alerta crítica' },
-  high:     { c: '#c084fc', key: 'Alta' },
-  medium:   { c: '#fbbf24', key: 'Media' },
-  low:      { c: '#38bdf8', key: 'Baja' },
+  high: { c: '#c084fc', key: 'Alta' },
+  medium: { c: '#fbbf24', key: 'Media' },
+  low: { c: '#38bdf8', key: 'Baja' },
 };
 const PROTO_COLOR = {
   TCP: '#3ddc97', HTTP: '#38bdf8', DNS: '#fbbf24', ICMP: '#c084fc', UDP: '#64748b', ARP: '#ff5a5f',
@@ -268,7 +268,7 @@ function Alerts({ t, lang, liveTs, data, onClear }) {
             <thead>
               <tr>
                 <th className="w-time">Hora</th><th>Tipo</th><th>Origen</th>
-                <th>Destino</th><th>Proto</th><th>Riesgo</th><th className="w-ev">Evidencia</th>
+                <th>Destino</th><th>Proto</th><th>Riesgo</th><th className="w-ev">Evidencia</th><th className="w-ws">Wireshark</th>
               </tr>
             </thead>
             <tbody>
@@ -290,9 +290,10 @@ function Alerts({ t, lang, liveTs, data, onClear }) {
                           </button>
                         ) : <span className="sub">—</span>}
                       </td>
+                      <td className="ws-cell"><CopyWsBtn r={a} /></td>
                     </tr>
                     {open[i] && a.evidence && (
-                      <tr className="ev-row"><td colSpan="7">
+                      <tr className="ev-row"><td colSpan="8">
                         <div className="ev-box">
                           {a.type === 'arp_spoof' && (
                             <div className="ev-line"><span className="ev-k">esperada</span><span className="mono">{a.expected_mac}</span>
@@ -385,298 +386,297 @@ function Reports({ t, lang, liveTs, data, onClear }) {
     </div>
   );
 }
-
 /* ============================================================
    WHITELIST
 ============================================================ */
 function Whitelist({ t, lang }) {
-  const [entries, setEntries] = useState([]);
-  const [msg, setMsg] = useState('');
-  const ipRef = useRef(null);
-  const macRef = useRef(null);
-  const noteRef = useRef(null);
+    const [entries, setEntries] = useState([]);
+    const [msg, setMsg] = useState('');
+    const ipRef = useRef(null);
+    const macRef = useRef(null);
+    const noteRef = useRef(null);
 
-  function fetchWhitelist() {
-    fetch('/api/whitelist')
-      .then(r => r.json())
-      .then(d => { if (d.whitelist) setEntries(d.whitelist); })
-      .catch(() => {});
-  }
-
-  useEffect(() => { fetchWhitelist(); }, []);
-
-  function addEntry(e) {
-    e.preventDefault();
-    const ip = ipRef.current ? ipRef.current.value.trim() : '';
-    const mac = macRef.current ? macRef.current.value.trim() : '';
-    const note = noteRef.current ? noteRef.current.value.trim() : '';
-    if (!ip && !mac) return;
-    fetch('/api/whitelist', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ip, mac, note }),
-    })
-      .then(r => r.json())
-      .then(d => {
-        if (d.ok) {
-          if (ipRef.current) ipRef.current.value = '';
-          if (macRef.current) macRef.current.value = '';
-          if (noteRef.current) noteRef.current.value = '';
-          setMsg('');
-          fetchWhitelist();
-        } else {
-          setMsg(d.error || 'Error');
-        }
-      })
-      .catch(() => setMsg('Error de conexión'));
-  }
-
-  function removeEntry(key) {
-    fetch('/api/whitelist/remove', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key }),
-    })
-      .then(r => r.json())
-      .then(d => { if (d.ok) fetchWhitelist(); })
-      .catch(() => {});
-  }
-
-  return (
-    <div className="screen wl-screen">
-      <div className="wl-grid">
-        <section className="card wl-form-card">
-          <div className="card-head"><h3>Agregar entrada</h3></div>
-          {msg && <div className="flash-err">{msg}</div>}
-          <form onSubmit={addEntry} className="wl-form">
-            <label className="field">
-              <span className="field-l">Dirección IP</span>
-              <input ref={ipRef} className="mono" name="ip" placeholder="192.168.1.50" />
-            </label>
-            <label className="field">
-              <span className="field-l">Dirección MAC <em>opcional</em></span>
-              <input ref={macRef} className="mono" name="mac" placeholder="aa:bb:cc:dd:ee:ff" />
-            </label>
-            <label className="field">
-              <span className="field-l">Nota</span>
-              <input ref={noteRef} name="note" placeholder="Ej. Impresora de oficina" />
-            </label>
-            <button type="submit" className="btn-primary">Agregar a la lista</button>
-          </form>
-        </section>
-
-        <section className="card wl-list-card">
-          <div className="card-head"><h3>Entradas de confianza</h3><span className="card-tag mono">{entries.length} entradas</span></div>
-          {entries.length ? (
-            <ul className="wl-list">
-              {entries.map((e) => (
-                <li key={e.key} className="wl-item">
-                  <span className="wl-avatar mono">{(e.ip || e.mac || '?').slice(0, 2)}</span>
-                  <div className="wl-meta">
-                    <div className="wl-ids mono">
-                      {e.ip && <span className="wl-ip">{e.ip}</span>}
-                      {e.mac && <span className="wl-mac">{e.mac}</span>}
-                    </div>
-                    {e.note && <div className="wl-note">{e.note}</div>}
-                  </div>
-                  <button className="wl-del" title="Eliminar" onClick={() => removeEntry(e.key)}>✕</button>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className="empty small">Aún no hay entradas en la lista blanca.</div>
-          )}
-        </section>
-      </div>
-    </div>
-  );
-}
-
-/* ============================================================
-   APP SHELL
-============================================================ */
-const NAV = [
-  { id: 'overview', icon: '◉', key: 'Resumen' },
-  { id: 'alerts', icon: '⚠', key: 'Alertas' },
-  { id: 'reports', icon: '≣', key: 'Reportes' },
-  { id: 'whitelist', icon: '✓', key: 'Lista Blanca' },
-];
-
-function App() {
-  const [lang, setLang] = useState(() => localStorage.getItem('ids_lang') || 'es');
-  const [screen, setScreen] = useState(() => localStorage.getItem('ids_screen') || 'overview');
-  const [clock, setClock] = useState(new Date());
-  const [now, setNow] = useState(Math.floor(Date.now() / 1000));
-
-  const [reports, setReports] = useState(INIT.reports);
-  const [alerts, setAlerts] = useState(INIT.alerts);
-  const [whitelist, setWhitelist] = useState(INIT.whitelist);
-
-  const lastAlertTs = useRef(
-    INIT.alerts.reduce((max, a) => Math.max(max, a.timestamp || 0), 0)
-  );
-  const lastReportTs = useRef(
-    INIT.reports.reduce((max, r) => Math.max(max, r.timestamp || 0), 0)
-  );
-
-  const t = (k) => k;
-
-  useEffect(() => { localStorage.setItem('ids_lang', lang); }, [lang]);
-  useEffect(() => { localStorage.setItem('ids_screen', screen); }, [screen]);
-
-  // Poll alerts
-  useEffect(() => {
-    const id = setInterval(async () => {
-      try {
-        const r = await fetch(`/api/alerts?since=${lastAlertTs.current}`);
-        const data = await r.json();
-        if (data.alerts && data.alerts.length) {
-          setAlerts(prev => [...prev, ...data.alerts]);
-          const maxTs = data.alerts.reduce((m, a) => Math.max(m, a.timestamp || 0), lastAlertTs.current);
-          lastAlertTs.current = maxTs;
-        }
-      } catch (e) {}
-    }, 3000);
-    return () => clearInterval(id);
-  }, []);
-
-  // Poll reports
-  useEffect(() => {
-    const id = setInterval(async () => {
-      try {
-        const r = await fetch(`/api/reports?since=${lastReportTs.current}`);
-        const data = await r.json();
-        if (data.reports && data.reports.length) {
-          setReports(prev => [...prev, ...data.reports]);
-          const maxTs = data.reports.reduce((m, r) => Math.max(m, r.timestamp || 0), lastReportTs.current);
-          lastReportTs.current = maxTs;
-        }
-      } catch (e) {}
-    }, 3000);
-    return () => clearInterval(id);
-  }, []);
-
-  // Poll whitelist for sidebar updates
-  useEffect(() => {
-    const id = setInterval(() => {
+    function fetchWhitelist() {
       fetch('/api/whitelist')
         .then(r => r.json())
-        .then(d => { if (d.whitelist) setWhitelist(d.whitelist); })
-        .catch(() => {});
-    }, 5000);
-    return () => clearInterval(id);
-  }, []);
+        .then(d => { if (d.whitelist) setEntries(d.whitelist); })
+        .catch(() => { });
+    }
 
-  // Update clock
-  useEffect(() => {
-    const id = setInterval(() => { setClock(new Date()); setNow((n) => n + 3); }, 3000);
-    return () => clearInterval(id);
-  }, []);
+    useEffect(() => { fetchWhitelist(); }, []);
 
-  useEffect(() => {
-    const id = setInterval(() => {
-      fetch('/api/reports')
+    function addEntry(e) {
+      e.preventDefault();
+      const ip = ipRef.current ? ipRef.current.value.trim() : '';
+      const mac = macRef.current ? macRef.current.value.trim() : '';
+      const note = noteRef.current ? noteRef.current.value.trim() : '';
+      if (!ip && !mac) return;
+      fetch('/api/whitelist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ip, mac, note }),
+      })
         .then(r => r.json())
-        .then(data => {
-          if (data.reports) {
-            setReports(data.reports);
-            const maxTs = data.reports.reduce((m, r) => Math.max(m, r.timestamp || 0), lastReportTs.current);
-            lastReportTs.current = maxTs;
+        .then(d => {
+          if (d.ok) {
+            if (ipRef.current) ipRef.current.value = '';
+            if (macRef.current) macRef.current.value = '';
+            if (noteRef.current) noteRef.current.value = '';
+            setMsg('');
+            fetchWhitelist();
+          } else {
+            setMsg(d.error || 'Error');
           }
         })
-        .catch(() => {});
-    }, 10000);
-    return () => clearInterval(id);
-  }, []);
+        .catch(() => setMsg('Error de conexión'));
+    }
 
-  useEffect(() => {
-    const id = setInterval(() => {
-      fetch('/api/alerts')
+    function removeEntry(key) {
+      fetch('/api/whitelist/remove', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key }),
+      })
         .then(r => r.json())
-        .then(data => {
-          if (data.alerts) {
-            setAlerts(data.alerts);
+        .then(d => { if (d.ok) fetchWhitelist(); })
+        .catch(() => { });
+    }
+
+    return (
+      <div className="screen wl-screen">
+        <div className="wl-grid">
+          <section className="card wl-form-card">
+            <div className="card-head"><h3>Agregar entrada</h3></div>
+            {msg && <div className="flash-err">{msg}</div>}
+            <form onSubmit={addEntry} className="wl-form">
+              <label className="field">
+                <span className="field-l">Dirección IP</span>
+                <input ref={ipRef} className="mono" name="ip" placeholder="192.168.1.50" />
+              </label>
+              <label className="field">
+                <span className="field-l">Dirección MAC <em>opcional</em></span>
+                <input ref={macRef} className="mono" name="mac" placeholder="aa:bb:cc:dd:ee:ff" />
+              </label>
+              <label className="field">
+                <span className="field-l">Nota</span>
+                <input ref={noteRef} name="note" placeholder="Ej. Impresora de oficina" />
+              </label>
+              <button type="submit" className="btn-primary">Agregar a la lista</button>
+            </form>
+          </section>
+
+          <section className="card wl-list-card">
+            <div className="card-head"><h3>Entradas de confianza</h3><span className="card-tag mono">{entries.length} entradas</span></div>
+            {entries.length ? (
+              <ul className="wl-list">
+                {entries.map((e) => (
+                  <li key={e.key} className="wl-item">
+                    <span className="wl-avatar mono">{(e.ip || e.mac || '?').slice(0, 2)}</span>
+                    <div className="wl-meta">
+                      <div className="wl-ids mono">
+                        {e.ip && <span className="wl-ip">{e.ip}</span>}
+                        {e.mac && <span className="wl-mac">{e.mac}</span>}
+                      </div>
+                      {e.note && <div className="wl-note">{e.note}</div>}
+                    </div>
+                    <button className="wl-del" title="Eliminar" onClick={() => removeEntry(e.key)}>✕</button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="empty small">No hay entradas autorizadas.</div>
+            )}
+          </section>
+        </div>
+      </div>
+    );
+  }
+
+  /* ============================================================
+     APP SHELL
+  ============================================================ */
+  const NAV = [
+    { id: 'overview', icon: '◉', key: 'Resumen' },
+    { id: 'alerts', icon: '⚠', key: 'Alertas' },
+    { id: 'reports', icon: '≣', key: 'Reportes' },
+    { id: 'whitelist', icon: '✓', key: 'Lista Blanca' },
+  ];
+
+  function App() {
+    const [lang, setLang] = useState(() => localStorage.getItem('ids_lang') || 'es');
+    const [screen, setScreen] = useState(() => localStorage.getItem('ids_screen') || 'overview');
+    const [clock, setClock] = useState(new Date());
+    const [now, setNow] = useState(Math.floor(Date.now() / 1000));
+
+    const [reports, setReports] = useState(INIT.reports);
+    const [alerts, setAlerts] = useState(INIT.alerts);
+    const [whitelist, setWhitelist] = useState(INIT.whitelist);
+
+    const lastAlertTs = useRef(
+      INIT.alerts.reduce((max, a) => Math.max(max, a.timestamp || 0), 0)
+    );
+    const lastReportTs = useRef(
+      INIT.reports.reduce((max, r) => Math.max(max, r.timestamp || 0), 0)
+    );
+
+    const t = (k) => k;
+
+    useEffect(() => { localStorage.setItem('ids_lang', lang); }, [lang]);
+    useEffect(() => { localStorage.setItem('ids_screen', screen); }, [screen]);
+
+    // Poll alerts
+    useEffect(() => {
+      const id = setInterval(async () => {
+        try {
+          const r = await fetch(`/api/alerts?since=${lastAlertTs.current}`);
+          const data = await r.json();
+          if (data.alerts && data.alerts.length) {
+            setAlerts(prev => [...prev, ...data.alerts]);
             const maxTs = data.alerts.reduce((m, a) => Math.max(m, a.timestamp || 0), lastAlertTs.current);
             lastAlertTs.current = maxTs;
           }
+        } catch (e) { }
+      }, 3000);
+      return () => clearInterval(id);
+    }, []);
+
+    // Poll reports
+    useEffect(() => {
+      const id = setInterval(async () => {
+        try {
+          const r = await fetch(`/api/reports?since=${lastReportTs.current}`);
+          const data = await r.json();
+          if (data.reports && data.reports.length) {
+            setReports(prev => [...prev, ...data.reports]);
+            const maxTs = data.reports.reduce((m, r) => Math.max(m, r.timestamp || 0), lastReportTs.current);
+            lastReportTs.current = maxTs;
+          }
+        } catch (e) { }
+      }, 3000);
+      return () => clearInterval(id);
+    }, []);
+
+    // Poll whitelist for sidebar updates
+    useEffect(() => {
+      const id = setInterval(() => {
+        fetch('/api/whitelist')
+          .then(r => r.json())
+          .then(d => { if (d.whitelist) setWhitelist(d.whitelist); })
+          .catch(() => { });
+      }, 5000);
+      return () => clearInterval(id);
+    }, []);
+
+    // Update clock
+    useEffect(() => {
+      const id = setInterval(() => { setClock(new Date()); setNow((n) => n + 3); }, 3000);
+      return () => clearInterval(id);
+    }, []);
+
+    useEffect(() => {
+      const id = setInterval(() => {
+        fetch('/api/reports')
+          .then(r => r.json())
+          .then(data => {
+            if (data.reports) {
+              setReports(data.reports);
+              const maxTs = data.reports.reduce((m, r) => Math.max(m, r.timestamp || 0), 0);
+              lastReportTs.current = maxTs;
+            }
+          })
+          .catch(() => { });
+      }, 10000);
+      return () => clearInterval(id);
+    }, []);
+
+    useEffect(() => {
+      const id = setInterval(() => {
+        fetch('/api/alerts')
+          .then(r => r.json())
+          .then(data => {
+            if (data.alerts) {
+              setAlerts(data.alerts);
+              const maxTs = data.alerts.reduce((m, a) => Math.max(m, a.timestamp || 0), 0);
+              lastAlertTs.current = maxTs;
+            }
+          })
+          .catch(() => { });
+      }, 10000);
+      return () => clearInterval(id);
+    }, []);
+
+    const liveTs = '· ' + fmtClock(clock);
+    const data = { reports, alerts, whitelist };
+
+    function clearAlerts() {
+      fetch('/api/alerts/clear', { method: 'POST' })
+        .then(() => {
+          setAlerts([]);
+          lastAlertTs.current = Math.floor(Date.now() / 1000);
         })
-        .catch(() => {});
-    }, 10000);
-    return () => clearInterval(id);
-  }, []);
+        .catch(() => { });
+    }
 
-  const liveTs = '· ' + fmtClock(clock);
-  const data = { reports, alerts, whitelist };
+    function clearReports() {
+      fetch('/api/reports/clear', { method: 'POST' })
+        .then(() => {
+          setReports([]);
+          lastReportTs.current = Math.floor(Date.now() / 1000);
+        })
+        .catch(() => { });
+    }
 
-  function clearAlerts() {
-    fetch('/alerts/clear', { method: 'POST' })
-      .then(() => {
-        setAlerts([]);
-        lastAlertTs.current = Math.floor(Date.now() / 1000);
-      })
-      .catch(() => {});
-  }
-
-  function clearReports() {
-    fetch('/reports/clear', { method: 'POST' })
-      .then(() => {
-        setReports([]);
-        lastReportTs.current = Math.floor(Date.now() / 1000);
-      })
-      .catch(() => {});
-  }
-
-  return (
-    <div className="app">
-      <aside className="sidebar">
-        <div className="brand">
-          <div className="brand-mark mono">IDS<span className="blink">_</span></div>
-          <div className="brand-sub">Sistema de Detección de Intrusos</div>
-        </div>
-        <nav className="nav">
-          {NAV.map((n) => (
-            <button key={n.id} className={'nav-item' + (screen === n.id ? ' active' : '')} onClick={() => setScreen(n.id)}>
-              <span className="nav-ic">{n.icon}</span>
-              <span>{n.key}</span>
-              {n.id === 'alerts' && <span className="nav-badge">{alerts.length}</span>}
-            </button>
-          ))}
-        </nav>
-        <div className="side-foot">
-          <div className="monitor">
-            <span className="mon-dot"></span>
-            <div>
-              <div className="mon-l">Monitor activo</div>
-              <div className="mon-s mono">iface: simulación</div>
+    return (
+      <div className="app">
+        <aside className="sidebar">
+          <div className="brand">
+            <div className="brand-mark mono">IDS<span className="blink">_</span></div>
+            <div className="brand-sub">Sistema de Detección de Intrusos</div>
+          </div>
+          <nav className="nav">
+            {NAV.map((n) => (
+              <button key={n.id} className={'nav-item' + (screen === n.id ? ' active' : '')} onClick={() => setScreen(n.id)}>
+                <span className="nav-ic">{n.icon}</span>
+                <span>{n.key}</span>
+                {n.id === 'alerts' && <span className="nav-badge">{alerts.length}</span>}
+              </button>
+            ))}
+          </nav>
+          <div className="side-foot">
+            <div className="monitor">
+              <span className="mon-dot"></span>
+              <div>
+                <div className="mon-l">Monitor activo</div>
+                <div className="mon-s mono">iface: simulación</div>
+              </div>
+            </div>
+            <div className="lang-toggle">
+              {['es', 'en'].map((l) => (
+                <button key={l} className={'lang-btn' + (lang === l ? ' active' : '')} onClick={() => setLang(l)}>{l.toUpperCase()}</button>
+              ))}
             </div>
           </div>
-          <div className="lang-toggle">
-            {['es', 'en'].map((l) => (
-              <button key={l} className={'lang-btn' + (lang === l ? ' active' : '')} onClick={() => setLang(l)}>{l.toUpperCase()}</button>
-            ))}
-          </div>
-        </div>
-      </aside>
+        </aside>
 
-      <main className="main">
-        <header className="topbar">
-          <div className="topbar-l">
-            <span className="prompt mono">~/ids<span className="prompt-sep">/</span>{screen}</span>
-            <h1>{NAV.find((n) => n.id === screen).key}</h1>
+        <main className="main">
+          <header className="topbar">
+            <div className="topbar-l">
+              <span className="prompt mono">~/ids<span className="prompt-sep">/</span>{screen}</span>
+              <h1>{NAV.find((n) => n.id === screen).key}</h1>
+            </div>
+            <div className="topbar-r">
+              <span className="sys-clock mono">{fmtClock(clock)}</span>
+            </div>
+          </header>
+          <div className="content">
+            {screen === 'overview' && <Overview t={t} lang={lang} now={now} data={data} />}
+            {screen === 'alerts' && <Alerts t={t} lang={lang} liveTs={liveTs} data={data} onClear={clearAlerts} />}
+            {screen === 'reports' && <Reports t={t} lang={lang} liveTs={liveTs} data={data} onClear={clearReports} />}
+            {screen === 'whitelist' && <Whitelist />}
           </div>
-          <div className="topbar-r">
-            <span className="sys-clock mono">{fmtClock(clock)}</span>
-          </div>
-        </header>
-        <div className="content">
-          {screen === 'overview' && <Overview t={t} lang={lang} now={now} data={data} />}
-          {screen === 'alerts' && <Alerts t={t} lang={lang} liveTs={liveTs} data={data} onClear={clearAlerts} />}
-          {screen === 'reports' && <Reports t={t} lang={lang} liveTs={liveTs} data={data} onClear={clearReports} />}
-          {screen === 'whitelist' && <Whitelist />}
-        </div>
-      </main>
-    </div>
-  );
-}
+        </main>
+      </div>
+    );
+  }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  ReactDOM.createRoot(document.getElementById('root')).render(<App />);

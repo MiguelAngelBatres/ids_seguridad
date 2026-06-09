@@ -2,6 +2,8 @@ import ipaddress
 import os
 import threading
 import time
+import urllib.request
+import urllib.error
 from pathlib import Path
 
 from .emailer import send_alert_email
@@ -62,15 +64,128 @@ for f in (WHITELIST_FILE, BLACKLIST_FILE, REPORTS_FILE, ALERTS_FILE):
 
 _monitor_thread = None
 _monitor_lock = threading.Lock()
-_reports_lock = threading.Lock()
-_alerts_lock = threading.Lock()
+
+_DATA_LOCK = threading.Lock()
+_MAX_EVENTS = 10000
+
+def _rebuild_blacklist_sets(blacklist):
+    ips = set()
+    domains = set()
+    for entry in blacklist:
+        if entry.get('ip'):
+            ips.add(entry['ip'].lower())
+        if entry.get('host'):
+            domains.add(entry['host'].lower())
+        if entry.get('domain'):
+            domains.add(entry['domain'].lower())
+    return ips, domains
+
+_initial_blacklist = load_json(BLACKLIST_FILE)
+_initial_ips, _initial_domains = _rebuild_blacklist_sets(_initial_blacklist)
+
+_STATE = {
+    'whitelist': load_json(WHITELIST_FILE),
+    'reports': load_json(REPORTS_FILE),
+    'alerts': load_json(ALERTS_FILE),
+    'blacklist': _initial_blacklist,
+    'blacklist_ips': _initial_ips,
+    'blacklist_domains': _initial_domains,
+}
+_NEEDS_FLUSH = False
+
+
+def _disk_flusher():
+    global _NEEDS_FLUSH
+    while True:
+        time.sleep(3.0)
+        with _DATA_LOCK:
+            if not _NEEDS_FLUSH:
+                continue
+            whitelist = list(_STATE['whitelist'])
+            reports = list(_STATE['reports'])
+            alerts = list(_STATE['alerts'])
+            _NEEDS_FLUSH = False
+        
+        try:
+            save_json(WHITELIST_FILE, whitelist)
+            save_json(REPORTS_FILE, reports)
+            save_json(ALERTS_FILE, alerts)
+        except Exception as e:
+            print(f'Error flushing disk: {e}')
+
+
+threading.Thread(target=_disk_flusher, daemon=True).start()
+
+
+def _update_external_blacklist():
+    while True:
+        try:
+            print("Descargando listas negras de inteligencia de amenazas...")
+            new_entries = []
+            
+            # 1. Feodo Tracker (Botnet C2)
+            try:
+                req = urllib.request.Request(
+                    'https://feodotracker.abuse.ch/downloads/ipblocklist.txt', 
+                    headers={'User-Agent': 'Mozilla/5.0 (IDS Console)'}
+                )
+                with urllib.request.urlopen(req, timeout=15) as r:
+                    for line in r.read().decode('utf-8').splitlines():
+                        line = line.strip()
+                        if line and not line.startswith('#'):
+                            new_entries.append({
+                                'ip': line,
+                                'risk': 'Botnet C2',
+                                'note': 'Abuse.ch Feodo Tracker'
+                            })
+            except Exception as e:
+                print(f"Error descargando Feodo Tracker: {e}")
+
+            # 2. CINS Army
+            try:
+                req = urllib.request.Request(
+                    'http://cinsscore.com/list/ci-badguys.txt',
+                    headers={'User-Agent': 'Mozilla/5.0 (IDS Console)'}
+                )
+                with urllib.request.urlopen(req, timeout=15) as r:
+                    for line in r.read().decode('utf-8').splitlines():
+                        line = line.strip()
+                        if line and not line.startswith('#'):
+                            new_entries.append({
+                                'ip': line,
+                                'risk': 'Malware/Scanner',
+                                'note': 'CINS Army'
+                            })
+            except Exception as e:
+                print(f"Error descargando CINS Army: {e}")
+
+            if new_entries:
+                ips, domains = _rebuild_blacklist_sets(new_entries)
+                with _DATA_LOCK:
+                    _STATE['blacklist'] = new_entries
+                    _STATE['blacklist_ips'] = ips
+                    _STATE['blacklist_domains'] = domains
+                try:
+                    save_json(BLACKLIST_FILE, new_entries)
+                except Exception as e:
+                    print(f"Error guardando blacklist: {e}")
+                print(f"Lista negra actualizada: {len(new_entries)} entradas.")
+
+        except Exception as e:
+            print(f"Error general en la actualizacion de la lista negra: {e}")
+            
+        time.sleep(86400) # 24 horas
+
+threading.Thread(target=_update_external_blacklist, daemon=True).start()
 
 
 def get_whitelist():
-    return load_json(WHITELIST_FILE)
+    with _DATA_LOCK:
+        return list(_STATE['whitelist'])
 
 
 def add_whitelist_entry(ip, mac, note=None):
+    global _NEEDS_FLUSH
     ip = (ip or '').strip() or None
     mac = normalize_mac(mac)
     note = (note or '').strip() or None
@@ -82,44 +197,51 @@ def add_whitelist_entry(ip, mac, note=None):
     if not is_valid_mac(mac):
         raise ValueError('La MAC no tiene un formato valido')
 
-    entries = get_whitelist()
-    for entry in entries:
-        if ip and ip == entry.get('ip'):
-            raise ValueError('La IP ya existe en la lista blanca')
-        if mac and mac == normalize_mac(entry.get('mac')):
-            raise ValueError('La MAC ya existe en la lista blanca')
+    with _DATA_LOCK:
+        for entry in _STATE['whitelist']:
+            if ip and ip == entry.get('ip'):
+                raise ValueError('La IP ya existe en la lista blanca')
+            if mac and mac == normalize_mac(entry.get('mac')):
+                raise ValueError('La MAC ya existe en la lista blanca')
 
-    key = f"{ip or ''}-{mac or ''}-{int(time.time())}"
-    entries.append({'key': key, 'ip': ip, 'mac': mac, 'note': note})
-    save_json(WHITELIST_FILE, entries)
+        key = f"{ip or ''}-{mac or ''}-{int(time.time())}"
+        _STATE['whitelist'].append({'key': key, 'ip': ip, 'mac': mac, 'note': note})
+        _NEEDS_FLUSH = True
     return key
 
 
 def remove_whitelist_entry(key):
-    entries = get_whitelist()
-    entries = [e for e in entries if e.get('key') != key]
-    save_json(WHITELIST_FILE, entries)
+    global _NEEDS_FLUSH
+    with _DATA_LOCK:
+        _STATE['whitelist'] = [e for e in _STATE['whitelist'] if e.get('key') != key]
+        _NEEDS_FLUSH = True
 
 
 def get_reports():
-    return load_json(REPORTS_FILE)
+    with _DATA_LOCK:
+        return list(_STATE['reports'])
 
 
 def get_alerts():
-    return load_json(ALERTS_FILE)
+    with _DATA_LOCK:
+        return list(_STATE['alerts'])
 
 
 def get_alerts_since(since_ts):
-    return [a for a in get_alerts() if int(a.get('timestamp', 0) or 0) > since_ts]
+    with _DATA_LOCK:
+        return [a for a in _STATE['alerts'] if int(a.get('timestamp', 0) or 0) > since_ts]
 
 
 def get_reports_since(since_ts):
-    return [r for r in get_reports() if int(r.get('timestamp', 0) or 0) > since_ts]
+    with _DATA_LOCK:
+        return [r for r in _STATE['reports'] if int(r.get('timestamp', 0) or 0) > since_ts]
 
 
 def clear_alerts():
-    with _alerts_lock:
-        save_json(ALERTS_FILE, [])
+    global _NEEDS_FLUSH
+    with _DATA_LOCK:
+        _STATE['alerts'] = []
+        _NEEDS_FLUSH = True
 
 
 def _clear_file(filepath):
@@ -128,7 +250,10 @@ def _clear_file(filepath):
 
 
 def clear_reports():
-    _clear_file(REPORTS_FILE)
+    global _NEEDS_FLUSH
+    with _DATA_LOCK:
+        _STATE['reports'] = []
+        _NEEDS_FLUSH = True
 
 
 def _source_whitelisted(event, whitelist):
@@ -144,16 +269,19 @@ def _source_whitelisted(event, whitelist):
     return False
 
 
-def _find_threat(event, blacklist):
-    candidates = {
-        v.lower() for v in (event.get('dst'), event.get('domain')) if v
-    }
-    for entry in blacklist:
-        values = {
-            v.lower() for v in (entry.get('ip'), entry.get('host'), entry.get('domain')) if v
-        }
-        if candidates & values:
-            return entry
+def _find_threat(event):
+    dst = (event.get('dst') or '').lower()
+    domain = (event.get('domain') or '').lower()
+    
+    with _DATA_LOCK:
+        if dst in _STATE['blacklist_ips'] or domain in _STATE['blacklist_domains']:
+            candidates = {v for v in (dst, domain) if v}
+            for entry in _STATE['blacklist']:
+                values = {
+                    v.lower() for v in (entry.get('ip'), entry.get('host'), entry.get('domain')) if v
+                }
+                if candidates & values:
+                    return entry
     return None
 
 
@@ -174,10 +302,12 @@ def _detect_arp_spoof(event, whitelist):
 
 
 def _persist_alert(alert):
-    with _alerts_lock:
-        alerts = load_json(ALERTS_FILE)
-        alerts.append(alert)
-        save_json(ALERTS_FILE, alerts)
+    global _NEEDS_FLUSH
+    with _DATA_LOCK:
+        _STATE['alerts'].append(alert)
+        if len(_STATE['alerts']) > _MAX_EVENTS:
+            _STATE['alerts'] = _STATE['alerts'][-_MAX_EVENTS:]
+        _NEEDS_FLUSH = True
 
 
 def _send_email_async(alert, with_whois=False):
@@ -186,6 +316,17 @@ def _send_email_async(alert, with_whois=False):
         if with_whois:
             target = alert.get('dst') or alert.get('domain')
             whois_result = query_whois(target) if target else None
+            if whois_result:
+                with _DATA_LOCK:
+                    if 'evidence' not in alert:
+                        alert['evidence'] = {}
+                    if whois_result.get('abuse_contacts'):
+                        alert['evidence']['abuse_contacts'] = whois_result['abuse_contacts']
+                    if whois_result.get('raw'):
+                        lines = whois_result['raw'].splitlines()
+                        alert['evidence']['whois_raw'] = lines[:30] # Limitamos a 30 lineas para no saturar la UI
+                    global _NEEDS_FLUSH
+                    _NEEDS_FLUSH = True
         try:
             send_alert_email(alert, whois_result)
         except Exception as e:
@@ -199,17 +340,18 @@ def _emit_alert(alert, with_whois=False):
 
 
 def _handle_event(event):
+    global _NEEDS_FLUSH
     event.setdefault('timestamp', int(time.time()))
     event['src_mac'] = normalize_mac(event.get('src_mac'))
     event['dst_mac'] = normalize_mac(event.get('dst_mac'))
 
-    with _reports_lock:
-        reports = load_json(REPORTS_FILE)
-        reports.append(event)
-        save_json(REPORTS_FILE, reports)
+    with _DATA_LOCK:
+        _STATE['reports'].append(event)
+        if len(_STATE['reports']) > _MAX_EVENTS:
+            _STATE['reports'] = _STATE['reports'][-_MAX_EVENTS:]
+        _NEEDS_FLUSH = True
 
     whitelist = get_whitelist()
-    blacklist = load_json(BLACKLIST_FILE)
     src_trusted = _source_whitelisted(event, whitelist)
 
     if not src_trusted and _is_local(event.get('src_ip')):
@@ -224,13 +366,22 @@ def _handle_event(event):
             'domain': event.get('domain'),
             'protocol': event.get('protocol'),
             'risk': 'Equipo no registrado en lista blanca',
+            'evidence': {
+                'motivo': 'IP/MAC no encontrada en whitelist.json',
+                'src_ip': event.get('src_ip'),
+                'src_mac': event.get('src_mac'),
+                'dst': event.get('dst'),
+                'dst_port': event.get('dst_port'),
+                'protocolo': event.get('protocol'),
+                'tamaño_paquete': event.get('size'),
+            },
         }
         _emit_alert(alert)
 
         for alert in get_engine().analyze(event):
             _emit_alert(alert)
 
-    threat = _find_threat(event, blacklist)
+    threat = _find_threat(event)
     if threat:
         alert = {
             'timestamp': event.get('timestamp', int(time.time())),
@@ -244,6 +395,18 @@ def _handle_event(event):
             'protocol': event.get('protocol'),
             'risk': threat.get('risk', 'Riesgo desconocido'),
             'blacklist_note': threat.get('note'),
+            'evidence': {
+                'motivo': 'Conexión a IP/dominio en lista negra',
+                'blacklist_ip': threat.get('ip'),
+                'blacklist_host': threat.get('host'),
+                'blacklist_domain': threat.get('domain'),
+                'riesgo': threat.get('risk'),
+                'nota': threat.get('note'),
+                'src_ip': event.get('src_ip'),
+                'src_mac': event.get('src_mac'),
+                'dst_port': event.get('dst_port'),
+                'protocolo': event.get('protocol'),
+            },
         }
         _emit_alert(alert, with_whois=True)
 
@@ -259,6 +422,14 @@ def _handle_event(event):
             'risk': 'Posible ARP spoofing: la IP de la lista blanca aparece con una MAC distinta',
             'expected_mac': arp['expected_mac'],
             'actual_mac': arp['actual_mac'],
+            'evidence': {
+                'motivo': 'MAC observada no coincide con la registrada en whitelist',
+                'ip': event.get('src_ip'),
+                'mac_esperada': arp['expected_mac'],
+                'mac_observada': arp['actual_mac'],
+                'dst': event.get('dst'),
+                'protocolo': event.get('protocol'),
+            },
         }
         _emit_alert(alert)
 
