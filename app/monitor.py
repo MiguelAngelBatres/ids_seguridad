@@ -193,6 +193,11 @@ def get_whitelist():
         return list(_STATE['whitelist'])
 
 
+def get_blacklist():
+    with _DATA_LOCK:
+        return list(_STATE['blacklist'])
+
+
 def add_whitelist_entry(ip, mac, note=None):
     global _NEEDS_FLUSH
     ip = (ip or '').strip() or None
