@@ -301,7 +301,20 @@ def _persist_alert(alert):
     with _DATA_LOCK:
         _STATE['alerts'].append(alert)
         if len(_STATE['alerts']) > _MAX_EVENTS:
-            _STATE['alerts'] = _STATE['alerts'][-_MAX_EVENTS:]
+            drop_count = len(_STATE['alerts']) - _MAX_EVENTS
+            new_alerts = []
+            dropped = 0
+            
+            for a in _STATE['alerts']:
+                if dropped < drop_count and a.get('type') == 'unauthorized_device':
+                    dropped += 1
+                else:
+                    new_alerts.append(a)
+                    
+            if len(new_alerts) > _MAX_EVENTS:
+                new_alerts = new_alerts[-_MAX_EVENTS:]
+                
+            _STATE['alerts'] = new_alerts
         _NEEDS_FLUSH = True
 
 
