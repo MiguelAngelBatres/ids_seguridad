@@ -230,10 +230,44 @@ def add_whitelist_entry(ip, mac, note=None):
     return key
 
 
+def add_blacklist_entry(ip=None, host=None, domain=None, risk=None, note=None):
+    global _NEEDS_FLUSH
+    ip = (ip or '').strip() or None
+    host = (host or '').strip() or None
+    domain = (domain or '').strip() or None
+    risk = (risk or '').strip() or None
+    note = (note or '').strip() or None
+
+    if not ip and not host and not domain:
+        raise ValueError('Debes capturar al menos una IP, host o dominio')
+
+    with _DATA_LOCK:
+        key = f"{ip or ''}-{host or ''}-{domain or ''}-{int(time.time())}"
+        _STATE['blacklist'].append({
+            'key': key, 'ip': ip, 'host': host,
+            'domain': domain, 'risk': risk, 'note': note,
+        })
+        ips, domains = _rebuild_blacklist_sets(_STATE['blacklist'])
+        _STATE['blacklist_ips'] = ips
+        _STATE['blacklist_domains'] = domains
+        _NEEDS_FLUSH = True
+    return key
+
+
 def remove_whitelist_entry(key):
     global _NEEDS_FLUSH
     with _DATA_LOCK:
         _STATE['whitelist'] = [e for e in _STATE['whitelist'] if e.get('key') != key]
+        _NEEDS_FLUSH = True
+
+
+def remove_blacklist_entry(key):
+    global _NEEDS_FLUSH
+    with _DATA_LOCK:
+        _STATE['blacklist'] = [e for e in _STATE['blacklist'] if e.get('key') != key]
+        ips, domains = _rebuild_blacklist_sets(_STATE['blacklist'])
+        _STATE['blacklist_ips'] = ips
+        _STATE['blacklist_domains'] = domains
         _NEEDS_FLUSH = True
 
 

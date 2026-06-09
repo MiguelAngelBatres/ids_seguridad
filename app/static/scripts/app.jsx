@@ -5,7 +5,7 @@
 ========================================================= */
 const { useState, useEffect, useMemo, useRef } = React;
 const D = window.IDS_DATA || {};
-const INIT = window.__INITIAL_DATA__ || { reports: [], alerts: [], whitelist: [] };
+const INIT = window.__INITIAL_DATA__ || { reports: [], alerts: [], whitelist: [], blacklist: [] };
 
 const I18N = D.I18N || {};
 
@@ -178,9 +178,9 @@ function Overview({ t, lang, now, data }) {
         <section className="card span-2-wide">
           <div className="card-head"><h3>Alertas en el tiempo</h3><span className="card-tag mono">{alerts.length} total</span></div>
           {agg.buckets.length > 0 ? (
-             <div className="chart-wrap" style={{ height: '220px', marginTop: '12px' }}>
-               <AreaTimeline series={agg.buckets} labels={agg.blabels} height={220} color="#3ddc97" />
-             </div>
+            <div className="chart-wrap" style={{ height: '220px', marginTop: '12px' }}>
+              <AreaTimeline series={agg.buckets} labels={agg.blabels} height={220} color="#3ddc97" />
+            </div>
           ) : (
             <div className="empty small">No hay suficientes datos de alertas</div>
           )}
@@ -264,58 +264,6 @@ function Alerts({ t, lang, liveTs, data, onClear }) {
     return hay.includes(q.toLowerCase());
   });
 
-  const shownIds = shown.map(a => a.id).filter(Boolean);
-  const isAllSelected = shownIds.length > 0 && shownIds.every(id => selected.has(id));
-  const isSomeSelected = shownIds.length > 0 && shownIds.some(id => selected.has(id)) && !isAllSelected;
-
-  function toggleAll() {
-    const next = new Set(selected);
-    if (isAllSelected) {
-      shownIds.forEach(id => next.delete(id));
-    } else {
-      shownIds.forEach(id => next.add(id));
-    }
-    setSelected(next);
-  }
-
-  function toggleOne(id) {
-    if (!id) return;
-    const next = new Set(selected);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    setSelected(next);
-  }
-
-  function deleteSelected() {
-    const arr = Array.from(selected);
-    if (!confirm(`¿Eliminar ${arr.length} alertas seleccionadas?`)) return;
-    fetch('/api/alerts/delete_batch', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids: arr })
-    }).then(() => setSelected(new Set()));
-  }
-
-  function whitelistSelected() {
-    const toWhitelist = alerts.filter(a => selected.has(a.id) && (a.src_ip || a.src_mac));
-    if (!toWhitelist.length) {
-      alert("Ninguna alerta seleccionada tiene una IP o MAC válida.");
-      return;
-    }
-    if (!confirm(`¿Agregar ${toWhitelist.length} dispositivos a la Lista Blanca?`)) return;
-    
-    Promise.all(toWhitelist.map(a => 
-      fetch('/api/whitelist', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ip: a.src_ip, mac: a.src_mac, note: 'Agregado en lote desde Alertas' })
-      })
-    )).then(() => {
-      alert(`${toWhitelist.length} dispositivos agregados a la lista blanca exitosamente.`);
-      setSelected(new Set());
-    });
-  }
-
   return (
     <div className="screen">
       <div className="toolbar">
@@ -327,32 +275,16 @@ function Alerts({ t, lang, liveTs, data, onClear }) {
           ))}
         </div>
         <div className="toolbar-right">
-          {selected.size > 0 ? (
-            <>
-              <span className="count-pill mono" style={{ background: '#3ddc97', color: '#0a0e12' }}>
-                {selected.size} sel
-              </span>
-              <button className="btn" onClick={whitelistSelected} style={{ background: '#0a0e12', border: '1px solid #3ddc97', color: '#3ddc97' }}>
-                Agregar a WL
-              </button>
-              <button className="btn-danger" onClick={deleteSelected}>
-                Eliminar Seleccionados
-              </button>
-            </>
-          ) : (
-            <>
-              <div className="search"><span className="search-i">⌕</span>
-                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar…" />
-              </div>
-              <Live t={t} ts={liveTs} />
-              <button className="btn-danger" onClick={() => { 
-                const msg = filter === 'all' ? '¿Limpiar todas las alertas?' : `¿Limpiar alertas de tipo ${filter}?`;
-                if (confirm(msg)) onClear(filter); 
-              }}>
-                Limpiar alertas
-              </button>
-            </>
-          )}
+          <div className="search"><span className="search-i">⌕</span>
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar…" />
+          </div>
+          <Live t={t} ts={liveTs} />
+          <button className="btn-danger" onClick={() => {
+            const msg = filter === 'all' ? '¿Limpiar todas las alertas?' : `¿Limpiar alertas de tipo ${filter}?`;
+            if (confirm(msg)) onClear(filter);
+          }}>
+            Limpiar alertas
+          </button>
         </div>
       </div>
 
@@ -385,8 +317,8 @@ function Alerts({ t, lang, liveTs, data, onClear }) {
                         <div className="sub">
                           {a.src_mac || ''}
                           {a.type === 'unauthorized_device' && (
-                            <button 
-                              className="btn-tiny" 
+                            <button
+                              className="btn-tiny"
                               style={{ marginLeft: '8px', padding: '1px 6px', fontSize: '10px', background: '#3ddc97', color: '#0a0e12', border: 'none', borderRadius: '3px', cursor: 'pointer' }}
                               onClick={() => quickWhitelist(a.src_ip, a.src_mac)}
                               title="Agregar IP/MAC a la Lista Blanca"
@@ -466,9 +398,9 @@ function Reports({ t, lang, liveTs, data, onClear }) {
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar…" />
           </div>
           <Live t={t} ts={liveTs} />
-          <button className="btn-danger" onClick={() => { 
+          <button className="btn-danger" onClick={() => {
             const msg = filter === 'all' ? '¿Limpiar todos los reportes?' : `¿Limpiar reportes de protocolo ${filter}?`;
-            if (confirm(msg)) onClear(filter); 
+            if (confirm(msg)) onClear(filter);
           }}>
             Limpiar reportes
           </button>
@@ -509,311 +441,435 @@ function Reports({ t, lang, liveTs, data, onClear }) {
    WHITELIST
 ============================================================ */
 function Whitelist({ t, lang }) {
-    const [entries, setEntries] = useState([]);
-    const [msg, setMsg] = useState('');
-    const ipRef = useRef(null);
-    const macRef = useRef(null);
-    const noteRef = useRef(null);
+  const [entries, setEntries] = useState([]);
+  const [msg, setMsg] = useState('');
+  const ipRef = useRef(null);
+  const macRef = useRef(null);
+  const noteRef = useRef(null);
 
-    function fetchWhitelist() {
+  function fetchWhitelist() {
+    fetch('/api/whitelist')
+      .then(r => r.json())
+      .then(d => { if (d.whitelist) setEntries(d.whitelist); })
+      .catch(() => { });
+  }
+
+  useEffect(() => { fetchWhitelist(); }, []);
+
+  function addEntry(e) {
+    e.preventDefault();
+    const ip = ipRef.current ? ipRef.current.value.trim() : '';
+    const mac = macRef.current ? macRef.current.value.trim() : '';
+    const note = noteRef.current ? noteRef.current.value.trim() : '';
+    if (!ip && !mac) return;
+    fetch('/api/whitelist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ip, mac, note }),
+    })
+      .then(r => r.json())
+      .then(d => {
+        if (d.ok) {
+          if (ipRef.current) ipRef.current.value = '';
+          if (macRef.current) macRef.current.value = '';
+          if (noteRef.current) noteRef.current.value = '';
+          setMsg('');
+          fetchWhitelist();
+        } else {
+          setMsg(d.error || 'Error');
+        }
+      })
+      .catch(() => setMsg('Error de conexión'));
+  }
+
+  function removeEntry(key) {
+    fetch('/api/whitelist/remove', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key }),
+    })
+      .then(r => r.json())
+      .then(d => { if (d.ok) fetchWhitelist(); })
+      .catch(() => { });
+  }
+
+  return (
+    <div className="screen wl-screen">
+      <div className="wl-grid">
+        <section className="card wl-form-card">
+          <div className="card-head"><h3>Agregar entrada</h3></div>
+          {msg && <div className="flash-err">{msg}</div>}
+          <form onSubmit={addEntry} className="wl-form">
+            <label className="field">
+              <span className="field-l">Dirección IP</span>
+              <input ref={ipRef} className="mono" name="ip" placeholder="192.168.1.50" />
+            </label>
+            <label className="field">
+              <span className="field-l">Dirección MAC <em>opcional</em></span>
+              <input ref={macRef} className="mono" name="mac" placeholder="aa:bb:cc:dd:ee:ff" />
+            </label>
+            <label className="field">
+              <span className="field-l">Nota</span>
+              <input ref={noteRef} name="note" placeholder="Ej. Impresora de oficina" />
+            </label>
+            <button type="submit" className="btn-primary">Agregar a la lista</button>
+          </form>
+        </section>
+
+        <section className="card wl-list-card">
+          <div className="card-head"><h3>Entradas de confianza</h3><span className="card-tag mono">{entries.length} entradas</span></div>
+          {entries.length ? (
+            <ul className="wl-list">
+              {entries.map((e) => (
+                <li key={e.key} className="wl-item">
+                  <span className="wl-avatar mono">{(e.ip || e.mac || '?').slice(0, 2)}</span>
+                  <div className="wl-meta">
+                    <div className="wl-ids mono">
+                      {e.ip && <span className="wl-ip">{e.ip}</span>}
+                      {e.mac && <span className="wl-mac">{e.mac}</span>}
+                    </div>
+                    {e.note && <div className="wl-note">{e.note}</div>}
+                  </div>
+                  <button className="wl-del" title="Eliminar" onClick={() => removeEntry(e.key)}>✕</button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="empty small">No hay entradas autorizadas.</div>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   BLACKLIST
+============================================================ */
+function Blacklist() {
+  const [entries, setEntries] = useState([]);
+  const [msg, setMsg] = useState('');
+  const ipRef = useRef(null);
+  const hostRef = useRef(null);
+  const domainRef = useRef(null);
+  const riskRef = useRef(null);
+  const noteRef = useRef(null);
+
+  function fetchBlacklist() {
+    fetch('/api/blacklist')
+      .then(r => r.json())
+      .then(d => { if (d.blacklist) setEntries(d.blacklist); })
+      .catch(() => { });
+  }
+
+  useEffect(() => { fetchBlacklist(); }, []);
+
+  function addEntry(e) {
+    e.preventDefault();
+    const ip = ipRef.current ? ipRef.current.value.trim() : '';
+    const host = hostRef.current ? hostRef.current.value.trim() : '';
+    const domain = domainRef.current ? domainRef.current.value.trim() : '';
+    const risk = riskRef.current ? riskRef.current.value.trim() : '';
+    const note = noteRef.current ? noteRef.current.value.trim() : '';
+    if (!ip && !host && !domain) return;
+    fetch('/api/blacklist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ip, host, domain, risk, note }),
+    })
+      .then(r => r.json())
+      .then(d => {
+        if (d.ok) {
+          if (ipRef.current) ipRef.current.value = '';
+          if (hostRef.current) hostRef.current.value = '';
+          if (domainRef.current) domainRef.current.value = '';
+          if (riskRef.current) riskRef.current.value = '';
+          if (noteRef.current) noteRef.current.value = '';
+          setMsg('');
+          fetchBlacklist();
+        } else {
+          setMsg(d.error || 'Error');
+        }
+      })
+      .catch(() => setMsg('Error de conexión'));
+  }
+
+  function removeEntry(key) {
+    fetch('/api/blacklist/remove', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key }),
+    })
+      .then(r => r.json())
+      .then(d => { if (d.ok) fetchBlacklist(); })
+      .catch(() => { });
+  }
+
+  return (
+    <div className="screen wl-screen">
+      <div className="wl-grid">
+        <section className="card wl-form-card">
+          <div className="card-head"><h3>Agregar entrada</h3></div>
+          {msg && <div className="flash-err">{msg}</div>}
+          <form onSubmit={addEntry} className="wl-form">
+            <label className="field">
+              <span className="field-l">Dirección IP</span>
+              <input ref={ipRef} className="mono" name="ip" placeholder="192.168.1.50" />
+            </label>
+            <label className="field">
+              <span className="field-l">Host</span>
+              <input ref={hostRef} className="mono" name="host" placeholder="malicious.example.com" />
+            </label>
+            <label className="field">
+              <span className="field-l">Dominio</span>
+              <input ref={domainRef} className="mono" name="domain" placeholder="ejemplo.com" />
+            </label>
+            <label className="field">
+              <span className="field-l">Riesgo</span>
+              <input ref={riskRef} name="risk" placeholder="Botnet C2" />
+            </label>
+            <label className="field">
+              <span className="field-l">Nota</span>
+              <input ref={noteRef} name="note" placeholder="Fuente de inteligencia" />
+            </label>
+            <button type="submit" className="btn-primary">Agregar a la lista negra</button>
+          </form>
+        </section>
+
+        <section className="card wl-list-card">
+          <div className="card-head"><h3>Lista Negra</h3><span className="card-tag mono">{entries.length} entradas</span></div>
+          {entries.length ? (
+            <ul className="wl-list">
+              {entries.map((e) => (
+                <li key={e.key} className="wl-item">
+                  <span className="wl-avatar mono">{(e.ip || e.host || e.domain || '?').slice(0, 2)}</span>
+                  <div className="wl-meta">
+                    <div className="wl-ids mono">
+                      {e.ip && <span className="wl-ip">{e.ip}</span>}
+                      {e.host && <span className="wl-mac">{e.host}</span>}
+                      {e.domain && <span className="wl-mac">{e.domain}</span>}
+                    </div>
+                    {e.risk && <div className="wl-note">Riesgo: {e.risk}</div>}
+                    {e.note && <div className="wl-note">{e.note}</div>}
+                  </div>
+                  <button className="wl-del" title="Eliminar" onClick={() => removeEntry(e.key)}>✕</button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="empty small">No hay entradas en la lista negra.</div>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   APP SHELL
+============================================================ */
+const NAV = [
+  { id: 'overview', icon: '◉', key: 'Resumen' },
+  { id: 'alerts', icon: '⚠', key: 'Alertas' },
+  { id: 'reports', icon: '≣', key: 'Reportes' },
+  { id: 'whitelist', icon: '✓', key: 'Lista Blanca' },
+  { id: 'blacklist', icon: '✕', key: 'Lista Negra' },
+];
+
+function App() {
+  const [lang, setLang] = useState(() => localStorage.getItem('ids_lang') || 'es');
+  const [screen, setScreen] = useState(() => localStorage.getItem('ids_screen') || 'overview');
+  const [clock, setClock] = useState(new Date());
+  const [now, setNow] = useState(Math.floor(Date.now() / 1000));
+
+  const [reports, setReports] = useState(INIT.reports);
+  const [alerts, setAlerts] = useState(INIT.alerts);
+  const [whitelist, setWhitelist] = useState(INIT.whitelist);
+  const [blacklist, setBlacklist] = useState(INIT.blacklist);
+
+  const lastAlertTs = useRef(
+    INIT.alerts.reduce((max, a) => Math.max(max, a.timestamp || 0), 0)
+  );
+  const lastReportTs = useRef(
+    INIT.reports.reduce((max, r) => Math.max(max, r.timestamp || 0), 0)
+  );
+
+  const t = (k) => k;
+
+  useEffect(() => { localStorage.setItem('ids_lang', lang); }, [lang]);
+  useEffect(() => { localStorage.setItem('ids_screen', screen); }, [screen]);
+
+  // Poll alerts
+  useEffect(() => {
+    const id = setInterval(async () => {
+      try {
+        const r = await fetch(`/api/alerts?since=${lastAlertTs.current}`);
+        const data = await r.json();
+        if (data.alerts && data.alerts.length) {
+          setAlerts(prev => [...prev, ...data.alerts]);
+          const maxTs = data.alerts.reduce((m, a) => Math.max(m, a.timestamp || 0), lastAlertTs.current);
+          lastAlertTs.current = maxTs;
+        }
+      } catch (e) { }
+    }, 3000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Poll reports
+  useEffect(() => {
+    const id = setInterval(async () => {
+      try {
+        const r = await fetch(`/api/reports?since=${lastReportTs.current}`);
+        const data = await r.json();
+        if (data.reports && data.reports.length) {
+          setReports(prev => [...prev, ...data.reports]);
+          const maxTs = data.reports.reduce((m, r) => Math.max(m, r.timestamp || 0), lastReportTs.current);
+          lastReportTs.current = maxTs;
+        }
+      } catch (e) { }
+    }, 3000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Poll whitelist for sidebar updates
+  useEffect(() => {
+    const id = setInterval(() => {
       fetch('/api/whitelist')
         .then(r => r.json())
-        .then(d => { if (d.whitelist) setEntries(d.whitelist); })
+        .then(d => { if (d.whitelist) setWhitelist(d.whitelist); })
         .catch(() => { });
-    }
+    }, 5000);
+    return () => clearInterval(id);
+  }, []);
 
-    useEffect(() => { fetchWhitelist(); }, []);
+  // Update clock
+  useEffect(() => {
+    const id = setInterval(() => { setClock(new Date()); setNow((n) => n + 3); }, 3000);
+    return () => clearInterval(id);
+  }, []);
 
-    function addEntry(e) {
-      e.preventDefault();
-      const ip = ipRef.current ? ipRef.current.value.trim() : '';
-      const mac = macRef.current ? macRef.current.value.trim() : '';
-      const note = noteRef.current ? noteRef.current.value.trim() : '';
-      if (!ip && !mac) return;
-      fetch('/api/whitelist', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ip, mac, note }),
-      })
+  useEffect(() => {
+    const id = setInterval(() => {
+      fetch('/api/reports')
         .then(r => r.json())
-        .then(d => {
-          if (d.ok) {
-            if (ipRef.current) ipRef.current.value = '';
-            if (macRef.current) macRef.current.value = '';
-            if (noteRef.current) noteRef.current.value = '';
-            setMsg('');
-            fetchWhitelist();
-          } else {
-            setMsg(d.error || 'Error');
-          }
-        })
-        .catch(() => setMsg('Error de conexión'));
-    }
-
-    function removeEntry(key) {
-      fetch('/api/whitelist/remove', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key }),
-      })
-        .then(r => r.json())
-        .then(d => { if (d.ok) fetchWhitelist(); })
-        .catch(() => { });
-    }
-
-    return (
-      <div className="screen wl-screen">
-        <div className="wl-grid">
-          <section className="card wl-form-card">
-            <div className="card-head"><h3>Agregar entrada</h3></div>
-            {msg && <div className="flash-err">{msg}</div>}
-            <form onSubmit={addEntry} className="wl-form">
-              <label className="field">
-                <span className="field-l">Dirección IP</span>
-                <input ref={ipRef} className="mono" name="ip" placeholder="192.168.1.50" />
-              </label>
-              <label className="field">
-                <span className="field-l">Dirección MAC <em>opcional</em></span>
-                <input ref={macRef} className="mono" name="mac" placeholder="aa:bb:cc:dd:ee:ff" />
-              </label>
-              <label className="field">
-                <span className="field-l">Nota</span>
-                <input ref={noteRef} name="note" placeholder="Ej. Impresora de oficina" />
-              </label>
-              <button type="submit" className="btn-primary">Agregar a la lista</button>
-            </form>
-          </section>
-
-          <section className="card wl-list-card">
-            <div className="card-head"><h3>Entradas de confianza</h3><span className="card-tag mono">{entries.length} entradas</span></div>
-            {entries.length ? (
-              <ul className="wl-list">
-                {entries.map((e) => (
-                  <li key={e.key} className="wl-item">
-                    <span className="wl-avatar mono">{(e.ip || e.mac || '?').slice(0, 2)}</span>
-                    <div className="wl-meta">
-                      <div className="wl-ids mono">
-                        {e.ip && <span className="wl-ip">{e.ip}</span>}
-                        {e.mac && <span className="wl-mac">{e.mac}</span>}
-                      </div>
-                      {e.note && <div className="wl-note">{e.note}</div>}
-                    </div>
-                    <button className="wl-del" title="Eliminar" onClick={() => removeEntry(e.key)}>✕</button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <div className="empty small">No hay entradas autorizadas.</div>
-            )}
-          </section>
-        </div>
-      </div>
-    );
-  }
-
-
-
-  /* ============================================================
-     APP SHELL
-  ============================================================ */
-  const NAV = [
-    { id: 'overview', icon: '◉', key: 'Resumen' },
-    { id: 'alerts', icon: '⚠', key: 'Alertas' },
-    { id: 'reports', icon: '≣', key: 'Reportes' },
-    { id: 'whitelist', icon: '✓', key: 'Lista Blanca' },
-  ];
-
-  function App() {
-    const [lang, setLang] = useState(() => localStorage.getItem('ids_lang') || 'es');
-    const [screen, setScreen] = useState(() => localStorage.getItem('ids_screen') || 'overview');
-    const [clock, setClock] = useState(new Date());
-    const [now, setNow] = useState(Math.floor(Date.now() / 1000));
-
-    const [reports, setReports] = useState(INIT.reports);
-    const [alerts, setAlerts] = useState(INIT.alerts);
-    const [whitelist, setWhitelist] = useState(INIT.whitelist);
-
-    const lastAlertTs = useRef(
-      INIT.alerts.reduce((max, a) => Math.max(max, a.timestamp || 0), 0)
-    );
-    const lastReportTs = useRef(
-      INIT.reports.reduce((max, r) => Math.max(max, r.timestamp || 0), 0)
-    );
-
-    const t = (k) => k;
-
-    useEffect(() => { localStorage.setItem('ids_lang', lang); }, [lang]);
-    useEffect(() => { localStorage.setItem('ids_screen', screen); }, [screen]);
-
-    // Poll alerts
-    useEffect(() => {
-      const id = setInterval(async () => {
-        try {
-          const r = await fetch(`/api/alerts?since=${lastAlertTs.current}`);
-          const data = await r.json();
-          if (data.alerts && data.alerts.length) {
-            setAlerts(prev => [...prev, ...data.alerts]);
-            const maxTs = data.alerts.reduce((m, a) => Math.max(m, a.timestamp || 0), lastAlertTs.current);
-            lastAlertTs.current = maxTs;
-          }
-        } catch (e) { }
-      }, 3000);
-      return () => clearInterval(id);
-    }, []);
-
-    // Poll reports
-    useEffect(() => {
-      const id = setInterval(async () => {
-        try {
-          const r = await fetch(`/api/reports?since=${lastReportTs.current}`);
-          const data = await r.json();
-          if (data.reports && data.reports.length) {
-            setReports(prev => [...prev, ...data.reports]);
-            const maxTs = data.reports.reduce((m, r) => Math.max(m, r.timestamp || 0), lastReportTs.current);
+        .then(data => {
+          if (data.reports) {
+            setReports(data.reports);
+            const maxTs = data.reports.reduce((m, r) => Math.max(m, r.timestamp || 0), 0);
             lastReportTs.current = maxTs;
           }
-        } catch (e) { }
-      }, 3000);
-      return () => clearInterval(id);
-    }, []);
-
-    // Poll whitelist for sidebar updates
-    useEffect(() => {
-      const id = setInterval(() => {
-        fetch('/api/whitelist')
-          .then(r => r.json())
-          .then(d => { if (d.whitelist) setWhitelist(d.whitelist); })
-          .catch(() => { });
-      }, 5000);
-      return () => clearInterval(id);
-    }, []);
-
-    // Update clock
-    useEffect(() => {
-      const id = setInterval(() => { setClock(new Date()); setNow((n) => n + 3); }, 3000);
-      return () => clearInterval(id);
-    }, []);
-
-    useEffect(() => {
-      const id = setInterval(() => {
-        fetch('/api/reports')
-          .then(r => r.json())
-          .then(data => {
-            if (data.reports) {
-              setReports(data.reports);
-              const maxTs = data.reports.reduce((m, r) => Math.max(m, r.timestamp || 0), 0);
-              lastReportTs.current = maxTs;
-            }
-          })
-          .catch(() => { });
-      }, 10000);
-      return () => clearInterval(id);
-    }, []);
-
-    useEffect(() => {
-      const id = setInterval(() => {
-        fetch('/api/alerts')
-          .then(r => r.json())
-          .then(data => {
-            if (data.alerts) {
-              setAlerts(data.alerts);
-              const maxTs = data.alerts.reduce((m, a) => Math.max(m, a.timestamp || 0), 0);
-              lastAlertTs.current = maxTs;
-            }
-          })
-          .catch(() => { });
-      }, 10000);
-      return () => clearInterval(id);
-    }, []);
-
-    const liveTs = '· ' + fmtClock(clock);
-    const data = { reports, alerts, whitelist };
-
-    function clearAlerts(typeFilter) {
-      fetch('/api/alerts/clear', { 
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: typeFilter === 'all' ? null : typeFilter })
-      })
-        .then(() => {
-          if (typeFilter === 'all') {
-            setAlerts([]);
-          } else {
-            setAlerts(prev => prev.filter(a => a.type !== typeFilter));
-          }
-          lastAlertTs.current = Math.floor(Date.now() / 1000);
         })
         .catch(() => { });
-    }
+    }, 10000);
+    return () => clearInterval(id);
+  }, []);
 
-    function clearReports(protoFilter) {
-      fetch('/api/reports/clear', { 
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ protocol: protoFilter === 'all' ? null : protoFilter })
-      })
-        .then(() => {
-          if (protoFilter === 'all') {
-            setReports([]);
-          } else {
-            setReports(prev => prev.filter(r => r.protocol !== protoFilter));
+  useEffect(() => {
+    const id = setInterval(() => {
+      fetch('/api/alerts')
+        .then(r => r.json())
+        .then(data => {
+          if (data.alerts) {
+            setAlerts(data.alerts);
+            const maxTs = data.alerts.reduce((m, a) => Math.max(m, a.timestamp || 0), 0);
+            lastAlertTs.current = maxTs;
           }
-          lastReportTs.current = Math.floor(Date.now() / 1000);
         })
         .catch(() => { });
-    }
+    }, 10000);
+    return () => clearInterval(id);
+  }, []);
 
-    return (
-      <div className="app">
-        <aside className="sidebar">
-          <div className="brand">
-            <div className="brand-mark mono">IDS<span className="blink">_</span></div>
-            <div className="brand-sub">Sistema de Detección de Intrusos</div>
-          </div>
-          <nav className="nav">
-            {NAV.map((n) => (
-              <button key={n.id} className={'nav-item' + (screen === n.id ? ' active' : '')} onClick={() => setScreen(n.id)}>
-                <span className="nav-ic">{n.icon}</span>
-                <span>{n.key}</span>
-                {n.id === 'alerts' && <span className="nav-badge">{alerts.length}</span>}
-              </button>
-            ))}
-          </nav>
-          <div className="side-foot">
-            <div className="monitor">
-              <span className="mon-dot"></span>
-              <div>
-                <div className="mon-l">Monitor activo</div>
-                <div className="mon-s mono">iface: simulación</div>
-              </div>
-            </div>
-            <div className="lang-toggle">
-              {['es', 'en'].map((l) => (
-                <button key={l} className={'lang-btn' + (lang === l ? ' active' : '')} onClick={() => setLang(l)}>{l.toUpperCase()}</button>
-              ))}
-            </div>
-          </div>
-        </aside>
+  const liveTs = '· ' + fmtClock(clock);
+  const data = { reports, alerts, whitelist };
 
-        <main className="main">
-          <header className="topbar">
-            <div className="topbar-l">
-              <span className="prompt mono">~/ids<span className="prompt-sep">/</span>{screen}</span>
-              <h1>{NAV.find((n) => n.id === screen).key}</h1>
-            </div>
-            <div className="topbar-r">
-              <span className="sys-clock mono">{fmtClock(clock)}</span>
-            </div>
-          </header>
-          <div className="content">
-            {screen === 'overview' && <Overview t={t} lang={lang} now={now} data={data} />}
-            {screen === 'alerts' && <Alerts t={t} lang={lang} liveTs={liveTs} data={data} onClear={clearAlerts} />}
-            {screen === 'reports' && <Reports t={t} lang={lang} liveTs={liveTs} data={data} onClear={clearReports} />}
-            {screen === 'whitelist' && <Whitelist />}
-          </div>
-        </main>
-      </div>
-    );
+  function clearAlerts(typeFilter) {
+    fetch('/api/alerts/clear', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: typeFilter === 'all' ? null : typeFilter })
+    })
+      .then(() => {
+        if (typeFilter === 'all') {
+          setAlerts([]);
+        } else {
+          setAlerts(prev => prev.filter(a => a.type !== typeFilter));
+        }
+        lastAlertTs.current = Math.floor(Date.now() / 1000);
+      })
+      .catch(() => { });
   }
 
-  ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  function clearReports(protoFilter) {
+    fetch('/api/reports/clear', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ protocol: protoFilter === 'all' ? null : protoFilter })
+    })
+      .then(() => {
+        if (protoFilter === 'all') {
+          setReports([]);
+        } else {
+          setReports(prev => prev.filter(r => r.protocol !== protoFilter));
+        }
+        lastReportTs.current = Math.floor(Date.now() / 1000);
+      })
+      .catch(() => { });
+  }
+
+  return (
+    <div className="app">
+      <aside className="sidebar">
+        <div className="brand">
+          <div className="brand-mark mono">IDS<span className="blink">_</span></div>
+          <div className="brand-sub">Sistema de Detección de Intrusos</div>
+        </div>
+        <nav className="nav">
+          {NAV.map((n) => (
+            <button key={n.id} className={'nav-item' + (screen === n.id ? ' active' : '')} onClick={() => setScreen(n.id)}>
+              <span className="nav-ic">{n.icon}</span>
+              <span>{n.key}</span>
+              {n.id === 'alerts' && <span className="nav-badge">{alerts.length}</span>}
+              {n.id === 'blacklist' && <span className="nav-badge">{blacklist.length}</span>}
+            </button>
+          ))}
+        </nav>
+        <div className="side-foot">
+          <div className="monitor">
+            <span className="mon-dot"></span>
+            <div>
+              <div className="mon-l">Monitor activo</div>
+              <div className="mon-s mono">iface: simulación</div>
+            </div>
+          </div>
+          <div className="lang-toggle">
+            {['es', 'en'].map((l) => (
+              <button key={l} className={'lang-btn' + (lang === l ? ' active' : '')} onClick={() => setLang(l)}>{l.toUpperCase()}</button>
+            ))}
+          </div>
+        </div>
+      </aside>
+
+      <main className="main">
+        <header className="topbar">
+          <div className="topbar-l">
+            <span className="prompt mono">~/ids<span className="prompt-sep">/</span>{screen}</span>
+            <h1>{NAV.find((n) => n.id === screen).key}</h1>
+          </div>
+          <div className="topbar-r">
+            <span className="sys-clock mono">{fmtClock(clock)}</span>
+          </div>
+        </header>
+        <div className="content">
+          {screen === 'overview' && <Overview t={t} lang={lang} now={now} data={data} />}
+          {screen === 'alerts' && <Alerts t={t} lang={lang} liveTs={liveTs} data={data} onClear={clearAlerts} />}
+          {screen === 'reports' && <Reports t={t} lang={lang} liveTs={liveTs} data={data} onClear={clearReports} />}
+          {screen === 'whitelist' && <Whitelist />}
+          {screen === 'blacklist' && <Blacklist />}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);

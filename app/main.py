@@ -5,6 +5,7 @@ from flask import Flask, flash, jsonify, redirect, render_template, request, sen
 load_dotenv()
 
 from .monitor import (
+    add_blacklist_entry,
     add_whitelist_entry,
     clear_alerts,
     clear_reports,
@@ -15,6 +16,7 @@ from .monitor import (
     get_reports,
     get_reports_since,
     get_whitelist,
+    remove_blacklist_entry,
     remove_whitelist_entry,
     start_monitoring,
 )
@@ -29,7 +31,13 @@ def index():
     alerts = get_alerts()
     whitelist = get_whitelist()
     blacklist = get_blacklist()
-    return render_template('index.html', reports=reports, alerts=alerts, whitelist=whitelist, blacklist=blacklist)
+    return render_template(
+        'index.html',
+        reports=reports,
+        alerts=alerts,
+        whitelist=whitelist,
+        blacklist=blacklist,
+    )
 
 
 @app.route('/style.css')
@@ -106,6 +114,34 @@ def api_whitelist_remove():
     if not key:
         return jsonify({'ok': False, 'error': 'Falta key'}), 400
     remove_whitelist_entry(key)
+    return jsonify({'ok': True})
+
+
+@app.route('/api/blacklist', methods=['GET', 'POST'])
+def api_blacklist():
+    if request.method == 'POST':
+        data = request.get_json(silent=True) or {}
+        try:
+            key = add_blacklist_entry(
+                ip=data.get('ip'),
+                host=data.get('host'),
+                domain=data.get('domain'),
+                risk=data.get('risk'),
+                note=data.get('note'),
+            )
+            return jsonify({'ok': True, 'key': key})
+        except ValueError as e:
+            return jsonify({'ok': False, 'error': str(e)}), 400
+    return jsonify({'blacklist': get_blacklist()})
+
+
+@app.route('/api/blacklist/remove', methods=['POST'])
+def api_blacklist_remove():
+    data = request.get_json(silent=True) or {}
+    key = data.get('key')
+    if not key:
+        return jsonify({'ok': False, 'error': 'Falta key'}), 400
+    remove_blacklist_entry(key)
     return jsonify({'ok': True})
 
 
