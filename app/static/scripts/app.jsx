@@ -580,7 +580,7 @@ function App() {
         .then(data => {
           if (data.reports) {
             setReports(data.reports);
-            const maxTs = data.reports.reduce((m, r) => Math.max(m, r.timestamp || 0), 0);
+            const maxTs = data.reports.reduce((m, r) => Math.max(m, r.timestamp || 0), lastReportTs.current);
             lastReportTs.current = maxTs;
           }
         })
@@ -596,7 +596,7 @@ function App() {
         .then(data => {
           if (data.alerts) {
             setAlerts(data.alerts);
-            const maxTs = data.alerts.reduce((m, a) => Math.max(m, a.timestamp || 0), 0);
+            const maxTs = data.alerts.reduce((m, a) => Math.max(m, a.timestamp || 0), lastAlertTs.current);
             lastAlertTs.current = maxTs;
           }
         })

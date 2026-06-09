@@ -12,7 +12,7 @@
 set -e
 
 # --- IP del IDS (cambiar si es diferente) ---
-IDS_IP="10.13.60.199"
+IDS_IP="10.13.140.32"
 
 # --- IPs de la blacklist del IDS ---
 # El IDS tiene estas IPs marcadas como peligrosas.

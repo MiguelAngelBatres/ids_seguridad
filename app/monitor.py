@@ -62,6 +62,8 @@ for f in (WHITELIST_FILE, BLACKLIST_FILE, REPORTS_FILE, ALERTS_FILE):
 
 _monitor_thread = None
 _monitor_lock = threading.Lock()
+_reports_lock = threading.Lock()
+_alerts_lock = threading.Lock()
 
 
 def get_whitelist():
@@ -116,11 +118,17 @@ def get_reports_since(since_ts):
 
 
 def clear_alerts():
-    save_json(ALERTS_FILE, [])
+    with _alerts_lock:
+        save_json(ALERTS_FILE, [])
+
+
+def _clear_file(filepath):
+    with _reports_lock:
+        save_json(filepath, [])
 
 
 def clear_reports():
-    save_json(REPORTS_FILE, [])
+    _clear_file(REPORTS_FILE)
 
 
 def _source_whitelisted(event, whitelist):
@@ -166,9 +174,10 @@ def _detect_arp_spoof(event, whitelist):
 
 
 def _persist_alert(alert):
-    alerts = load_json(ALERTS_FILE)
-    alerts.append(alert)
-    save_json(ALERTS_FILE, alerts)
+    with _alerts_lock:
+        alerts = load_json(ALERTS_FILE)
+        alerts.append(alert)
+        save_json(ALERTS_FILE, alerts)
 
 
 def _send_email_async(alert, with_whois=False):
@@ -194,9 +203,10 @@ def _handle_event(event):
     event['src_mac'] = normalize_mac(event.get('src_mac'))
     event['dst_mac'] = normalize_mac(event.get('dst_mac'))
 
-    reports = load_json(REPORTS_FILE)
-    reports.append(event)
-    save_json(REPORTS_FILE, reports)
+    with _reports_lock:
+        reports = load_json(REPORTS_FILE)
+        reports.append(event)
+        save_json(REPORTS_FILE, reports)
 
     whitelist = get_whitelist()
     blacklist = load_json(BLACKLIST_FILE)
