@@ -235,6 +235,16 @@ td.mono > div { line-height: 1.5; }
 .proto-chip { display: inline-block; padding: 2px 8px; font-family: var(--mono); font-size: 11px; border: 1px solid; border-radius: 5px; }
 .flags { margin-left: 6px; font-size: 11px; color: var(--tx-dim); }
 
+.w-ws { width: 70px; text-align: center; }
+.ws-cell { text-align: center; }
+.ws-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 28px; background: #0b1116; border: 1px solid var(--line);
+  border-radius: 6px; color: var(--tx-mid); font-size: 14px; cursor: pointer;
+  transition: all 0.15s ease;
+}
+.ws-btn:hover { border-color: var(--green); color: var(--green); background: var(--green-dim); box-shadow: 0 0 10px rgba(61,220,151,0.15); }
+
 .ev-btn { padding: 4px 11px; background: #0b1116; border: 1px solid var(--line); border-radius: 6px; color: var(--green); font-family: var(--mono); font-size: 11.5px; cursor: pointer; }
 .ev-btn:hover { border-color: var(--green); }
 .ev-row td { padding: 0 16px 14px; background: #0a0f13; }
