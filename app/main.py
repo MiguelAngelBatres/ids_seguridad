@@ -34,31 +34,6 @@ def legacy_style():
     return send_from_directory(app.static_folder, 'style.css')
 
 
-@app.route('/api/whitelist', methods=['GET', 'POST'])
-def api_whitelist():
-    if request.method == 'POST':
-        data = request.json or {}
-        ip = data.get('ip')
-        mac = data.get('mac')
-        note = data.get('note')
-        try:
-            add_whitelist_entry(ip, mac, note)
-            return jsonify({'success': True, 'message': 'Entrada agregada'})
-        except ValueError as exc:
-            return jsonify({'success': False, 'message': str(exc)}), 400
-    return jsonify({'whitelist': get_whitelist()})
-
-
-@app.route('/api/whitelist/remove', methods=['POST'])
-def api_whitelist_remove():
-    data = request.json or {}
-    key = data.get('key')
-    if key:
-        remove_whitelist_entry(key)
-        return jsonify({'success': True})
-    return jsonify({'success': False, 'message': 'Llave requerida'}), 400
-
-
 @app.route('/api/alerts/clear', methods=['POST'])
 def api_alerts_clear():
     clear_alerts()

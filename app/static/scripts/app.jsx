@@ -608,7 +608,7 @@ function Whitelist({ t, lang }) {
     const data = { reports, alerts, whitelist };
 
     function clearAlerts() {
-      fetch('/alerts/clear', { method: 'POST' })
+      fetch('/api/alerts/clear', { method: 'POST' })
         .then(() => {
           setAlerts([]);
           lastAlertTs.current = Math.floor(Date.now() / 1000);
@@ -617,7 +617,7 @@ function Whitelist({ t, lang }) {
     }
 
     function clearReports() {
-      fetch('/reports/clear', { method: 'POST' })
+      fetch('/api/reports/clear', { method: 'POST' })
         .then(() => {
           setReports([]);
           lastReportTs.current = Math.floor(Date.now() / 1000);
