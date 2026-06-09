@@ -214,6 +214,15 @@ def _handle_event(event):
             'domain': event.get('domain'),
             'protocol': event.get('protocol'),
             'risk': 'Equipo no registrado en lista blanca',
+            'evidence': {
+                'motivo': 'IP/MAC no encontrada en whitelist.json',
+                'src_ip': event.get('src_ip'),
+                'src_mac': event.get('src_mac'),
+                'dst': event.get('dst'),
+                'dst_port': event.get('dst_port'),
+                'protocolo': event.get('protocol'),
+                'tamaño_paquete': event.get('size'),
+            },
         }
         _emit_alert(alert)
 
@@ -234,6 +243,18 @@ def _handle_event(event):
             'protocol': event.get('protocol'),
             'risk': threat.get('risk', 'Riesgo desconocido'),
             'blacklist_note': threat.get('note'),
+            'evidence': {
+                'motivo': 'Conexión a IP/dominio en lista negra',
+                'blacklist_ip': threat.get('ip'),
+                'blacklist_host': threat.get('host'),
+                'blacklist_domain': threat.get('domain'),
+                'riesgo': threat.get('risk'),
+                'nota': threat.get('note'),
+                'src_ip': event.get('src_ip'),
+                'src_mac': event.get('src_mac'),
+                'dst_port': event.get('dst_port'),
+                'protocolo': event.get('protocol'),
+            },
         }
         _emit_alert(alert, with_whois=True)
 
@@ -249,6 +270,14 @@ def _handle_event(event):
             'risk': 'Posible ARP spoofing: la IP de la lista blanca aparece con una MAC distinta',
             'expected_mac': arp['expected_mac'],
             'actual_mac': arp['actual_mac'],
+            'evidence': {
+                'motivo': 'MAC observada no coincide con la registrada en whitelist',
+                'ip': event.get('src_ip'),
+                'mac_esperada': arp['expected_mac'],
+                'mac_observada': arp['actual_mac'],
+                'dst': event.get('dst'),
+                'protocolo': event.get('protocol'),
+            },
         }
         _emit_alert(alert)
 

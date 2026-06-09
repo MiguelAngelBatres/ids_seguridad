@@ -265,7 +265,7 @@ function Alerts({ t, lang, liveTs, data }) {
             <thead>
               <tr>
                 <th className="w-time">Hora</th><th>Tipo</th><th>Origen</th>
-                <th>Destino</th><th>Proto</th><th>Riesgo</th><th className="w-ev">Evidencia</th>
+                <th>Destino</th><th>Proto</th><th>Riesgo</th><th className="w-ev">Evidencia</th><th className="w-ws">Wireshark</th>
               </tr>
             </thead>
             <tbody>
@@ -287,9 +287,10 @@ function Alerts({ t, lang, liveTs, data }) {
                           </button>
                         ) : <span className="sub">—</span>}
                       </td>
+                      <td className="ws-cell"><CopyWsBtn r={a} /></td>
                     </tr>
                     {open[i] && a.evidence && (
-                      <tr className="ev-row"><td colSpan="7">
+                      <tr className="ev-row"><td colSpan="8">
                         <div className="ev-box">
                           {a.type === 'arp_spoof' && (
                             <div className="ev-line"><span className="ev-k">esperada</span><span className="mono">{a.expected_mac}</span>
