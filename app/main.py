@@ -34,49 +34,41 @@ def legacy_style():
     return send_from_directory(app.static_folder, 'style.css')
 
 
-@app.route('/whitelist', methods=['GET', 'POST'])
-def whitelist():
+@app.route('/api/whitelist', methods=['GET', 'POST'])
+def api_whitelist():
     if request.method == 'POST':
-        ip = request.form.get('ip')
-        mac = request.form.get('mac')
-        note = request.form.get('note')
+        data = request.json or {}
+        ip = data.get('ip')
+        mac = data.get('mac')
+        note = data.get('note')
         try:
             add_whitelist_entry(ip, mac, note)
-            flash('Entrada agregada a la lista blanca')
+            return jsonify({'success': True, 'message': 'Entrada agregada'})
         except ValueError as exc:
-            flash(str(exc))
-        return redirect(url_for('whitelist'))
-
-    entries = get_whitelist()
-    return render_template('whitelist.html', entries=entries)
+            return jsonify({'success': False, 'message': str(exc)}), 400
+    return jsonify({'whitelist': get_whitelist()})
 
 
-@app.route('/whitelist/remove', methods=['POST'])
-def whitelist_remove():
-    key = request.form.get('key')
-    remove_whitelist_entry(key)
-    flash('Entrada eliminada')
-    return redirect(url_for('whitelist'))
+@app.route('/api/whitelist/remove', methods=['POST'])
+def api_whitelist_remove():
+    data = request.json or {}
+    key = data.get('key')
+    if key:
+        remove_whitelist_entry(key)
+        return jsonify({'success': True})
+    return jsonify({'success': False, 'message': 'Llave requerida'}), 400
 
 
-@app.route('/reports')
-def reports():
-    reports = get_reports()
-    return render_template('reports.html', reports=reports)
-
-
-@app.route('/alerts/clear', methods=['POST'])
-def alerts_clear():
+@app.route('/api/alerts/clear', methods=['POST'])
+def api_alerts_clear():
     clear_alerts()
-    flash('Lista de alertas limpiada')
-    return redirect(url_for('index'))
+    return jsonify({'success': True})
 
 
-@app.route('/reports/clear', methods=['POST'])
-def reports_clear():
+@app.route('/api/reports/clear', methods=['POST'])
+def api_reports_clear():
     clear_reports()
-    flash('Lista de reportes limpiada')
-    return redirect(url_for('reports'))
+    return jsonify({'success': True})
 
 
 @app.route('/api/start')

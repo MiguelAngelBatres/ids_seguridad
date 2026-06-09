@@ -378,21 +378,64 @@ function Reports({ t, lang, liveTs, data }) {
         <div className="empty">Sin reportes registrados.</div>
       )}
     </div>
-  );
-}
-
 /* ============================================================
    WHITELIST
 ============================================================ */
 function Whitelist({ t, lang, data }) {
   const [entries, setEntries] = useState(() => [...(data.whitelist || [])]);
+  const [error, setError] = useState('');
+
+  const addEntry = async (e) => {
+    e.preventDefault();
+    setError('');
+    const form = e.target;
+    const ip = form.ip.value.trim();
+    const mac = form.mac.value.trim();
+    const note = form.note.value.trim();
+    
+    try {
+      const res = await fetch('/api/whitelist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ip, mac, note })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.message || 'Error al agregar entrada');
+      } else {
+        form.reset();
+        refresh();
+      }
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const removeEntry = async (key) => {
+    try {
+      const res = await fetch('/api/whitelist/remove', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key })
+      });
+      if (res.ok) refresh();
+    } catch (err) {}
+  };
+
+  const refresh = async () => {
+    try {
+      const res = await fetch('/api/whitelist');
+      const data = await res.json();
+      if (data.whitelist) setEntries(data.whitelist);
+    } catch (err) {}
+  };
 
   return (
     <div className="screen wl-screen">
       <div className="wl-grid">
         <section className="card wl-form-card">
           <div className="card-head"><h3>Agregar entrada</h3></div>
-          <form method="post" action="/whitelist" className="wl-form">
+          <form onSubmit={addEntry} className="wl-form">
             <label className="field">
               <span className="field-l">Dirección IP</span>
               <input className="mono" name="ip" placeholder="192.168.1.50" />
@@ -405,6 +448,7 @@ function Whitelist({ t, lang, data }) {
               <span className="field-l">Nota</span>
               <input name="note" placeholder="Ej. Impresora de oficina" />
             </label>
+            {error && <div style={{color: 'var(--red)', fontSize: '12px'}}>{error}</div>}
             <button type="submit" className="btn-primary">Agregar a la lista</button>
           </form>
         </section>
@@ -422,16 +466,12 @@ function Whitelist({ t, lang, data }) {
                       {e.mac && <span className="wl-mac">{e.mac}</span>}
                     </div>
                     {e.note && <div className="wl-note">{e.note}</div>}
-                  </div>
-                  <form method="post" action="/whitelist/remove" style={{ display: 'inline' }}>
-                    <input type="hidden" name="key" value={e.key} />
-                    <button className="wl-del" title="Eliminar">✕</button>
-                  </form>
+                  <button type="button" onClick={() => removeEntry(e.key)} className="wl-del" title="Eliminar">✕</button>
                 </li>
               ))}
             </ul>
           ) : (
-            <div className="empty small">Aún no hay entradas en la lista blanca.</div>
+            <div className="empty small">No hay entradas autorizadas.</div>
           )}
         </section>
       </div>

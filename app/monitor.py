@@ -63,12 +63,46 @@ for f in (WHITELIST_FILE, BLACKLIST_FILE, REPORTS_FILE, ALERTS_FILE):
 _monitor_thread = None
 _monitor_lock = threading.Lock()
 
+_DATA_LOCK = threading.Lock()
+_MAX_EVENTS = 10000
+_STATE = {
+    'whitelist': load_json(WHITELIST_FILE),
+    'reports': load_json(REPORTS_FILE),
+    'alerts': load_json(ALERTS_FILE),
+}
+_NEEDS_FLUSH = False
+
+
+def _disk_flusher():
+    global _NEEDS_FLUSH
+    while True:
+        time.sleep(3.0)
+        with _DATA_LOCK:
+            if not _NEEDS_FLUSH:
+                continue
+            whitelist = list(_STATE['whitelist'])
+            reports = list(_STATE['reports'])
+            alerts = list(_STATE['alerts'])
+            _NEEDS_FLUSH = False
+        
+        try:
+            save_json(WHITELIST_FILE, whitelist)
+            save_json(REPORTS_FILE, reports)
+            save_json(ALERTS_FILE, alerts)
+        except Exception as e:
+            print(f'Error flushing disk: {e}')
+
+
+threading.Thread(target=_disk_flusher, daemon=True).start()
+
 
 def get_whitelist():
-    return load_json(WHITELIST_FILE)
+    with _DATA_LOCK:
+        return list(_STATE['whitelist'])
 
 
 def add_whitelist_entry(ip, mac, note=None):
+    global _NEEDS_FLUSH
     ip = (ip or '').strip() or None
     mac = normalize_mac(mac)
     note = (note or '').strip() or None
@@ -80,47 +114,58 @@ def add_whitelist_entry(ip, mac, note=None):
     if not is_valid_mac(mac):
         raise ValueError('La MAC no tiene un formato valido')
 
-    entries = get_whitelist()
-    for entry in entries:
-        if ip and ip == entry.get('ip'):
-            raise ValueError('La IP ya existe en la lista blanca')
-        if mac and mac == normalize_mac(entry.get('mac')):
-            raise ValueError('La MAC ya existe en la lista blanca')
+    with _DATA_LOCK:
+        for entry in _STATE['whitelist']:
+            if ip and ip == entry.get('ip'):
+                raise ValueError('La IP ya existe en la lista blanca')
+            if mac and mac == normalize_mac(entry.get('mac')):
+                raise ValueError('La MAC ya existe en la lista blanca')
 
-    key = f"{ip or ''}-{mac or ''}-{int(time.time())}"
-    entries.append({'key': key, 'ip': ip, 'mac': mac, 'note': note})
-    save_json(WHITELIST_FILE, entries)
+        key = f"{ip or ''}-{mac or ''}-{int(time.time())}"
+        _STATE['whitelist'].append({'key': key, 'ip': ip, 'mac': mac, 'note': note})
+        _NEEDS_FLUSH = True
     return key
 
 
 def remove_whitelist_entry(key):
-    entries = get_whitelist()
-    entries = [e for e in entries if e.get('key') != key]
-    save_json(WHITELIST_FILE, entries)
+    global _NEEDS_FLUSH
+    with _DATA_LOCK:
+        _STATE['whitelist'] = [e for e in _STATE['whitelist'] if e.get('key') != key]
+        _NEEDS_FLUSH = True
 
 
 def get_reports():
-    return load_json(REPORTS_FILE)
+    with _DATA_LOCK:
+        return list(_STATE['reports'])
 
 
 def get_alerts():
-    return load_json(ALERTS_FILE)
+    with _DATA_LOCK:
+        return list(_STATE['alerts'])
 
 
 def get_alerts_since(since_ts):
-    return [a for a in get_alerts() if int(a.get('timestamp', 0) or 0) > since_ts]
+    with _DATA_LOCK:
+        return [a for a in _STATE['alerts'] if int(a.get('timestamp', 0) or 0) > since_ts]
 
 
 def get_reports_since(since_ts):
-    return [r for r in get_reports() if int(r.get('timestamp', 0) or 0) > since_ts]
+    with _DATA_LOCK:
+        return [r for r in _STATE['reports'] if int(r.get('timestamp', 0) or 0) > since_ts]
 
 
 def clear_alerts():
-    save_json(ALERTS_FILE, [])
+    global _NEEDS_FLUSH
+    with _DATA_LOCK:
+        _STATE['alerts'] = []
+        _NEEDS_FLUSH = True
 
 
 def clear_reports():
-    save_json(REPORTS_FILE, [])
+    global _NEEDS_FLUSH
+    with _DATA_LOCK:
+        _STATE['reports'] = []
+        _NEEDS_FLUSH = True
 
 
 def _source_whitelisted(event, whitelist):
@@ -166,9 +211,12 @@ def _detect_arp_spoof(event, whitelist):
 
 
 def _persist_alert(alert):
-    alerts = load_json(ALERTS_FILE)
-    alerts.append(alert)
-    save_json(ALERTS_FILE, alerts)
+    global _NEEDS_FLUSH
+    with _DATA_LOCK:
+        _STATE['alerts'].append(alert)
+        if len(_STATE['alerts']) > _MAX_EVENTS:
+            _STATE['alerts'] = _STATE['alerts'][-_MAX_EVENTS:]
+        _NEEDS_FLUSH = True
 
 
 def _send_email_async(alert, with_whois=False):
@@ -190,13 +238,16 @@ def _emit_alert(alert, with_whois=False):
 
 
 def _handle_event(event):
+    global _NEEDS_FLUSH
     event.setdefault('timestamp', int(time.time()))
     event['src_mac'] = normalize_mac(event.get('src_mac'))
     event['dst_mac'] = normalize_mac(event.get('dst_mac'))
 
-    reports = load_json(REPORTS_FILE)
-    reports.append(event)
-    save_json(REPORTS_FILE, reports)
+    with _DATA_LOCK:
+        _STATE['reports'].append(event)
+        if len(_STATE['reports']) > _MAX_EVENTS:
+            _STATE['reports'] = _STATE['reports'][-_MAX_EVENTS:]
+        _NEEDS_FLUSH = True
 
     whitelist = get_whitelist()
     blacklist = load_json(BLACKLIST_FILE)
