@@ -177,6 +177,13 @@ function Overview({ t, lang, now, data }) {
       <div className="grid-2">
         <section className="card span-2-wide">
           <div className="card-head"><h3>Alertas en el tiempo</h3><span className="card-tag mono">{alerts.length} total</span></div>
+          {agg.buckets.length > 0 ? (
+             <div className="chart-wrap" style={{ height: '220px', marginTop: '12px' }}>
+               <AreaTimeline series={agg.buckets} labels={agg.blabels} height={220} color="#3ddc97" />
+             </div>
+          ) : (
+            <div className="empty small">No hay suficientes datos de alertas</div>
+          )}
         </section>
         <section className="card">
           <div className="card-head"><h3>Distribución de riesgo</h3></div>
@@ -225,6 +232,21 @@ function Alerts({ t, lang, liveTs, data, onClear }) {
   const [filter, setFilter] = useState('all');
   const [open, setOpen] = useState({});
 
+  function quickWhitelist(ip, mac) {
+    if (!confirm(`¿Agregar ${ip || mac} a la lista blanca?`)) return;
+    fetch('/api/whitelist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ip, mac, note: 'Agregado desde Alertas' }),
+    }).then(r => r.json()).then(d => {
+      if (d.ok) {
+        alert('Agregado a lista blanca exitosamente.');
+      } else {
+        alert('Error: ' + d.error);
+      }
+    });
+  }
+
   const alerts = data.alerts;
   const rows = useMemo(() => [...alerts].reverse(), [alerts]);
   const types = ['all', 'unauthorized_device', 'threat_intel', 'arp_spoof', 'heuristic'];
@@ -256,7 +278,10 @@ function Alerts({ t, lang, liveTs, data, onClear }) {
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar…" />
           </div>
           <Live t={t} ts={liveTs} />
-          <button className="btn-danger" onClick={() => { if (confirm('¿Limpiar todas las alertas?')) onClear(); }}>
+          <button className="btn-danger" onClick={() => { 
+            const msg = filter === 'all' ? '¿Limpiar todas las alertas?' : `¿Limpiar alertas de tipo ${filter}?`;
+            if (confirm(msg)) onClear(filter); 
+          }}>
             Limpiar alertas
           </button>
         </div>
@@ -279,7 +304,22 @@ function Alerts({ t, lang, liveTs, data, onClear }) {
                     <tr className="data-row" style={{ '--sev': SEV[sev].c }}>
                       <td className="mono nowrap">{fmtTime(a.timestamp)}</td>
                       <td><TypeBadge a={a} /></td>
-                      <td className="mono"><div>{a.src_ip || 'N/D'}</div><div className="sub">{a.src_mac || ''}</div></td>
+                      <td className="mono">
+                        <div>{a.src_ip || 'N/D'}</div>
+                        <div className="sub">
+                          {a.src_mac || ''}
+                          {a.type === 'unauthorized_device' && (
+                            <button 
+                              className="btn-tiny" 
+                              style={{ marginLeft: '8px', padding: '1px 6px', fontSize: '10px', background: '#3ddc97', color: '#0a0e12', border: 'none', borderRadius: '3px', cursor: 'pointer' }}
+                              onClick={() => quickWhitelist(a.src_ip, a.src_mac)}
+                              title="Agregar IP/MAC a la Lista Blanca"
+                            >
+                              + WL
+                            </button>
+                          )}
+                        </div>
+                      </td>
                       <td className="mono"><div>{(a.dst || 'N/D') + (a.dst_port ? ':' + a.dst_port : '')}</div><div className="sub">{a.domain || ''}</div></td>
                       <td><ProtoChip p={a.protocol} /></td>
                       <td className="risk-cell">{a.risk}</td>
@@ -350,7 +390,10 @@ function Reports({ t, lang, liveTs, data, onClear }) {
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar…" />
           </div>
           <Live t={t} ts={liveTs} />
-          <button className="btn-danger" onClick={() => { if (confirm('¿Limpiar todos los reportes?')) onClear(); }}>
+          <button className="btn-danger" onClick={() => { 
+            const msg = filter === 'all' ? '¿Limpiar todos los reportes?' : `¿Limpiar reportes de protocolo ${filter}?`;
+            if (confirm(msg)) onClear(filter); 
+          }}>
             Limpiar reportes
           </button>
         </div>
@@ -608,19 +651,35 @@ function Whitelist({ t, lang }) {
     const liveTs = '· ' + fmtClock(clock);
     const data = { reports, alerts, whitelist };
 
-    function clearAlerts() {
-      fetch('/api/alerts/clear', { method: 'POST' })
+    function clearAlerts(typeFilter) {
+      fetch('/api/alerts/clear', { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: typeFilter === 'all' ? null : typeFilter })
+      })
         .then(() => {
-          setAlerts([]);
+          if (typeFilter === 'all') {
+            setAlerts([]);
+          } else {
+            setAlerts(prev => prev.filter(a => a.type !== typeFilter));
+          }
           lastAlertTs.current = Math.floor(Date.now() / 1000);
         })
         .catch(() => { });
     }
 
-    function clearReports() {
-      fetch('/api/reports/clear', { method: 'POST' })
+    function clearReports(protoFilter) {
+      fetch('/api/reports/clear', { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ protocol: protoFilter === 'all' ? null : protoFilter })
+      })
         .then(() => {
-          setReports([]);
+          if (protoFilter === 'all') {
+            setReports([]);
+          } else {
+            setReports(prev => prev.filter(r => r.protocol !== protoFilter));
+          }
           lastReportTs.current = Math.floor(Date.now() / 1000);
         })
         .catch(() => { });
