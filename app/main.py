@@ -9,6 +9,7 @@ from .monitor import (
     add_whitelist_entry,
     clear_alerts,
     clear_reports,
+    delete_alerts_batch,
     get_alerts,
     get_alerts_since,
     get_blacklist,
@@ -49,6 +50,15 @@ def api_alerts_clear():
     data = request.get_json(silent=True) or {}
     type_filter = data.get('type')
     clear_alerts(type_filter)
+    return jsonify({'success': True})
+
+
+@app.route('/api/alerts/delete_batch', methods=['POST'])
+def api_alerts_delete_batch():
+    data = request.get_json(silent=True) or {}
+    ids = data.get('ids', [])
+    if ids:
+        delete_alerts_batch(ids)
     return jsonify({'success': True})
 
 

@@ -4,6 +4,7 @@ import threading
 import time
 import urllib.request
 import urllib.error
+import uuid
 from pathlib import Path
 
 from .emailer import send_alert_email
@@ -83,15 +84,20 @@ def _rebuild_blacklist_sets(blacklist):
 _initial_blacklist = load_json(BLACKLIST_FILE)
 _initial_ips, _initial_domains = _rebuild_blacklist_sets(_initial_blacklist)
 
+_alerts = load_json(ALERTS_FILE)
+for a in _alerts:
+    if 'id' not in a:
+        a['id'] = str(uuid.uuid4())
+
 _STATE = {
     'whitelist': load_json(WHITELIST_FILE),
     'reports': load_json(REPORTS_FILE),
-    'alerts': load_json(ALERTS_FILE),
+    'alerts': _alerts,
     'blacklist': _initial_blacklist,
     'blacklist_ips': _initial_ips,
     'blacklist_domains': _initial_domains,
 }
-_NEEDS_FLUSH = False
+_NEEDS_FLUSH = True
 
 
 def _disk_flusher():
@@ -294,6 +300,13 @@ def clear_alerts(type_filter=None):
             _STATE['alerts'] = []
         _NEEDS_FLUSH = True
 
+def delete_alerts_batch(ids):
+    global _NEEDS_FLUSH
+    with _DATA_LOCK:
+        ids_set = set(ids)
+        _STATE['alerts'] = [a for a in _STATE['alerts'] if a.get('id') not in ids_set]
+        _NEEDS_FLUSH = True
+
 
 
 def _clear_file(filepath):
@@ -314,13 +327,31 @@ def clear_reports(proto_filter=None):
 def _source_whitelisted(event, whitelist):
     src_mac = normalize_mac(event.get('src_mac'))
     src_ip = event.get('src_ip')
+    
+    parsed_src_ip = None
+    if src_ip:
+        try:
+            parsed_src_ip = ipaddress.ip_address(src_ip)
+        except ValueError:
+            pass
+
     for entry in whitelist:
         entry_ip = entry.get('ip')
         entry_mac = normalize_mac(entry.get('mac'))
-        if src_ip and entry_ip and src_ip == entry_ip:
-            return True
+        
+        if parsed_src_ip and entry_ip:
+            if '/' in entry_ip:
+                try:
+                    if parsed_src_ip in ipaddress.ip_network(entry_ip, strict=False):
+                        return True
+                except ValueError:
+                    pass
+            elif src_ip == entry_ip:
+                return True
+                
         if src_mac and entry_mac and src_mac == entry_mac:
             return True
+            
     return False
 
 
@@ -358,6 +389,9 @@ def _detect_arp_spoof(event, whitelist):
 
 def _persist_alert(alert):
     global _NEEDS_FLUSH
+    if 'id' not in alert:
+        alert['id'] = str(uuid.uuid4())
+        
     with _DATA_LOCK:
         _STATE['alerts'].append(alert)
         if len(_STATE['alerts']) > _MAX_EVENTS:
