@@ -22,5 +22,17 @@
     "ip": "192.168.1.1",
     "mac": null,
     "note": "Router/gateway de la casa"
+  },
+  {
+    "key": "172.20.0.2-e2:1f:91:a8:c3:4c-1781033445",
+    "ip": "172.20.0.2",
+    "mac": "e2:1f:91:a8:c3:4c",
+    "note": "Agregado desde Alertas"
+  },
+  {
+    "key": "172.20.0.1-d2:71:34:6e:f0:6b-1781033501",
+    "ip": "172.20.0.1",
+    "mac": "d2:71:34:6e:f0:6b",
+    "note": "Agregado desde Alertas"
   }
 ]

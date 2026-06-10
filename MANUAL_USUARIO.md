@@ -9,13 +9,12 @@
 
 ### 1.1 Prerrequisitos del sistema
 
-| Componente | Versión mínima | Notas |
-|---|---|---|
-| Python | 3.8+ | Verificar con `python3 --version` |
-| pip | 21+ | Normalmente incluido con Python |
-| libpcap | 1.9+ | Necesario solo para captura real de paquetes |
-| tcpdump | 4.9+ | Opcional, útil para depurar captura |
-| whois | 5.5+ | Opcional, para consultas WHOIS en alertas threat_intel |
+| Componente | Versión mínima | Notas                                                  |
+| Python     | 3.8+           | Verificar con `python3 --version`                      |
+| pip        | 21+            | Normalmente incluido con Python                        |
+| libpcap    | 1.9+           | Necesario solo para captura real de paquetes           |
+| tcpdump    | 4.9+           | Opcional, útil para depurar captura                    |
+| whois      | 5.5+           | Opcional, para consultas WHOIS en alertas threat_intel |
 
 **Instalación de dependencias del sistema (Linux):**
 
@@ -155,27 +154,27 @@ Verá el panel principal con tres secciones:
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│  IDS Console                                   [En vivo] ●          │
+│  IDS Console                                   [En vivo] ●           │
 │──────────────────────────────────────────────────────────────────────│
 │                                                                      │
-│  ┌─ Alertas ───────────────────────────────────────────────────────┐ │
-│  │  Mapa de calor de alertas (últimas 24h)                        │ │
-│  │  ████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░                       │ │
-│  │                                                                 │ │
-│  │  Lista de alertas recientes...                                 │ │
-│  └────────────────────────────────────────────────────────────────-┘ │
+│  ┌─ Alertas ──────────────────────────────────────────────────────┐  │
+│  │  Mapa de calor de alertas (últimas 24h)                        │  │
+│  │  ████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░                       │  │
+│  │                                                                │  │
+│  │  Lista de alertas recientes...                                 │  │
+│  └────────────────────────────────────────────────────────────────┘  │
 │                                                                      │
-│  ┌─ Dispositivos Whitelist ───────────────────────────────────────┐ │
-│  │  192.168.1.100 - aa:bb:cc:dd:ee:ff - Servidor Web             │ │
-│  │  192.168.1.39 - (sin MAC) - Mi computadora                    │ │
-│  └────────────────────────────────────────────────────────────────-┘ │
+│  ┌─ Dispositivos Whitelist ───────────────────────────────────────┐  │
+│  │  192.168.1.100 - aa:bb:cc:dd:ee:ff - Servidor Web              │  │
+│  │  192.168.1.39 - (sin MAC) - Mi computadora                     │  │
+│  └────────────────────────────────────────────────────────────────┘  │
 │                                                                      │
-│  ┌─ Eventos Recientes ─────────────────────────────────────────────┐ │
-│  │  09/Jun 12:34:56  192.168.1.39 → 203.0.113.66  HTTP           │ │
-│  │  09/Jun 12:34:54  192.168.1.39 → 8.8.8.8      DNS            │ │
-│  └────────────────────────────────────────────────────────────────-┘ │
+│  ┌─ Eventos Recientes ────────────────────────────────────────────┐  │
+│  │  09/Jun 12:34:56  192.168.1.39 → 203.0.113.66  HTTP            │  │
+│  │  09/Jun 12:34:54  192.168.1.39 → 8.8.8.8      DNS              │  │
+│  └────────────────────────────────────────────────────────────────┘  │
 │                                                                      │
-│  [Whitelist]  [Reportes]  [Limpiar Alertas]                         │
+│  [Whitelist]  [Reportes]  [Limpiar Alertas]                          │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -203,9 +202,9 @@ La lista blanca (whitelist) contiene los dispositivos autorizados en la red. Cua
    │  [Agregar]                          │
    │                                     │
    │  ─ Entradas ─────────────────────── │
-   │  • 192.168.1.100 - aa:bb:cc:dd:    │
+   │  • 192.168.1.100 - aa:bb:cc:dd:     │
    │    ee:ff - Servidor Web  [Eliminar] │
-   │  • 192.168.1.39 - (sin MAC) -      │
+   │  • 192.168.1.39 - (sin MAC) -       │
    │    Mi compu  [Eliminar]             │
    └─────────────────────────────────────┘
    ```
@@ -241,18 +240,18 @@ Cada paquete o evento de red capturado se registra en la sección **Reportes**.
 
    ```
    ┌──────────────────────────────────────────────────────────────────┐
-   │  Reportes                                       [En vivo] ●     │
-   │  47 eventos capturados.                       [Limpiar lista]   │
+   │  Reportes                                       [En vivo] ●      │
+   │  47 eventos capturados.                       [Limpiar lista]    │
    │──────────────────────────────────────────────────────────────────│
-   │  ┌─────────────────────────────────────────────────────────────┐│
-   │  │  Hora      │ Origen        │ Destino       │Proto│Dom│Tam  ││
-   │  │────────────┼───────────────┼───────────────┼─────┼───┼─────││
-   │  │ [filtro]   │ [filtro]      │ [filtro]      │[filt]│[f]│[f] ││
-   │  ├────────────┼───────────────┼───────────────┼─────┼───┼─────││
-   │  │ 1718000000 │ 192.168.1.39 │ 203.0.113.66  │HTTP │ - │ 1420││
-   │  │            │ aa:bb:cc:..  │               │     │   │     ││
-   │  │ 1718000002 │ 192.168.1.39 │ 8.8.8.8       │DNS  │go..│ 78  ││
-   │  └─────────────────────────────────────────────────────────────┘│
+   │  ┌─────────────────────────────────────────────────────────────┐ │
+   │  │  Hora      │ Origen        │ Destino       │Proto│Dom│Tam   │ │
+   │  │────────────┼───────────────┼───────────────┼─────┼────┼─────│ │
+   │  │ [filtro]   │ [filtro]      │ [filtro]      │filt │ [f]│ [f] │ │
+   │  ├────────────┼───────────────┼───────────────┼─────┼────┼─────│ │
+   │  │ 1718000000 │ 192.168.1.39  │ 203.0.113.66  │HTTP │ -  │1420 │ │
+   │  │            │ aa:bb:cc:..   │               │     │    │     │ │
+   │  │ 1718000002 │ 192.168.1.39  │ 8.8.8.8       │DNS  │go..│ 78  │ │
+   │  └─────────────────────────────────────────────────────────────┘ │
    └──────────────────────────────────────────────────────────────────┘
    ```
 
@@ -338,12 +337,12 @@ El motor heurístico detecta patrones anómalos: escaneo de puertos, inundación
 
 Tipos de detección heurística:
 
-| Subtipo | Disparo | Umbral por defecto |
-|---|---|---|
-| `port_scan` | Misma IP consulta ≥15 puertos distintos en 60s | 15 puertos / 60s |
-| `icmp_flood` | Misma IP envía ≥20 paquetes ICMP en 30s | 20 paquetes / 30s |
-| `syn_flood` | Misma IP envía ≥50 SYN en 10s | 50 SYN / 10s |
-| `brute_force` | Misma IP conecta a ≥20 puertos sensibles (22,23,3389,...) en 60s | 20 intentos / 60s |
+| Subtipo     | Disparo                                         | Umbral por defecto |
+|-------------|-------------------------------------------------|--------------------|
+| `port_scan` | Misma IP consulta ≥15 puertos distintos en 60s  | 15 puertos / 60s   |
+| `icmp_flood`| Misma IP envía ≥20 paquetes ICMP en 30s         | 20 paquetes / 30s  |
+| `syn_flood` | Misma IP envía ≥50 SYN en 10s                   | 50 SYN / 10s       |
+|`brute_force`| Misma IP conecta a ≥20 puertos sensibles en 60s | 20 intentos / 60s  |
 
 > **Nota:** Las alertas heurísticas se **silencian** para fuentes en whitelist para evitar falsos positivos de escaneos internos legítimos.
 
@@ -518,7 +517,79 @@ Si usó `docker compose down -v`, el volumen se elimina. Use solo `docker compos
 
 3. La simulación (`SCAPY_ENABLE=0`) genera eventos genéricos que pueden no disparar heurísticas. Use captura real o modifique la simulación para generar tráfico que active las reglas.
 
-### 3.10 La interfaz web no carga
+### 3.10 Python version antigua (&lt; 3.8)
+
+**Síntoma:** `SyntaxError` o `ModuleNotFoundError` en módulos estándar al ejecutar.
+
+**Solución:** Verifique la version de Python:
+
+```bash
+python3 --version
+```
+
+Si es menor a 3.8, instale una version mas reciente:
+
+```bash
+# Ubuntu/Debian
+sudo apt install -y python3.12 python3.12-venv python3.12-pip
+# Crear el entorno virtual con la version nueva
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### 3.11 Falta el archivo .env
+
+**Sintoma:** Flask lanza errores de clave secreta o la aplicacion no levanta correctamente.
+
+**Solucion:** El archivo `.env` no se incluye en el repositorio (esta en `.gitignore` por seguridad). Copie el archivo de ejemplo:
+
+```bash
+cp .env.example .env
+```
+
+Luego ajuste las variables segun su entorno (al menos `ADMIN_EMAIL` para recibir correos). El `.env.example` contiene valores por defecto funcionales para modo simulacion.
+
+### 3.12 Archivos JSON corruptos
+
+**Sintoma:** El monitor no procesa eventos correctamente o muestra datos vacios.
+
+**Solucion:** Los archivos en `data/` pueden corromperse si se editan manualmente con mala sintaxis o si el sistema se apaga mientras escribe. Verifique con:
+
+```bash
+python3 -m json.tool data/alerts.json    # Repetir para reports, whitelist, blacklist
+```
+
+Si alguno esta corrupto, detenga el sistema, elimine el archivo corrupto o reinicielo (el sistema lo recrea vacio automaticamente):
+
+```bash
+rm data/alerts.json   # Se recreara al iniciar
+```
+
+> ⚠️ Si elimina `data/whitelist.json` o `data/blacklist.json`, perdera las entradas personalizadas. Haga una copia de seguridad primero.
+
+### 3.13 El puerto 5000 ya esta en uso
+
+**Sintoma:** Al iniciar, Flask muestra `Address already in use` y la aplicacion no arranca.
+
+**Soluciones:**
+
+1. **Cambiar de puerto** en `.env`:
+   ```
+   PORT=8080
+   ```
+
+2. **Matar el proceso anterior** que ocupa el puerto:
+   ```bash
+   kill $(lsof -ti:5000)
+   ```
+
+3. **Verificar que proceso lo ocupa:**
+   ```bash
+   ss -tlnp | grep 5000
+   ```
+
+### 3.14 La interfaz web no carga
 
 **Síntoma:** El navegador muestra "No se puede conectar" o error de conexión.
 
@@ -535,22 +606,98 @@ ss -tlnp | grep 5000
 sudo ufw status
 ```
 
-Si el puerto 5000 ya está ocupado, cambie el `PORT` en `.env`:
+### 3.14 Archivos data/ con permisos incorrectos tras usar sudo
+
+**Sintoma:** Despues de ejecutar con `sudo` para captura real, al volver a ejecutar sin sudo el sistema no puede escribir en `data/` y falla silenciosamente.
+
+**Solucion:** Los archivos creados por el proceso con sudo pertenecen a root. Reasignelos a su usuario:
+
+```bash
+sudo chown -R $USER:$USER data/
+```
+
+### 3.15 whois no instalado
+
+**Sintoma:** Las alertas `threat_intel` se generan pero sin informacion WHOIS ni contactos de abuso.
+
+**Solucion:** Instale la herramienta whois:
+
+```bash
+sudo apt install whois
+```
+
+### 3.16 Sin conexion a internet (listas negras externas no se descargan)
+
+**Sintoma:** La lista negra (`data/blacklist.json`) esta vacia o solo tiene entradas manuales. El sistema intenta descargar de Feodo Tracker y CINS Army cada 24h, pero si no hay internet falla silenciosamente.
+
+**Solucion:** El sistema sigue funcionando sin las descargas. Para poblarla manualmente, agregue entradas desde la interfaz web (seccion Blacklist) o edite directamente `data/blacklist.json`:
+
+```json
+[
+  {"ip": "203.0.113.66", "risk": "Manual", "note": "Agregada sin internet"}
+]
+```
+
+### 3.17 Captura real sin eventos (interfaz equivocada)
+
+**Sintoma:** La aplicacion inicia en modo real pero no aparecen eventos en Reportes, aunque haya trafico en la red.
+
+**Solucion:** Verifique el nombre correcto de la interfaz de red:
+
+```bash
+ip link show
+```
+
+Identifique la interfaz activa (ej. `eth0`, `wlan0`, `enp0s3`, `ens33`) y especifiquela en `.env`:
 
 ```
-PORT=8080
+SCAPY_IFACE=eth0
 ```
+
+O pasela directamente al ejecutar:
+
+```bash
+SCAPY_IFACE=eth0 SCAPY_ENABLE=1 sudo -E python -m app.main
+```
+
+### 3.18 Entorno virtual olvidado
+
+**Sintoma:** `ModuleNotFoundError: No module named 'flask'` a pesar de haber ejecutado `pip install -r requirements.txt`.
+
+**Solucion:** Verifique que el entorno virtual esta activado:
+
+```bash
+which python3
+# Debe mostrar algo como: .../ids_seguridad/.venv/bin/python3
+# Si muestra /usr/bin/python3, no esta activado.
+
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### 3.19 Modo simulacion sin actividad visible
+
+**Sintoma:** El usuario cree que el sistema no funciona porque no ve eventos, cuando en realidad esta en modo simulacion y los eventos se generan cada 2 segundos.
+
+**Solucion:** Revise en `.env` el valor de `SCAPY_ENABLE`:
+
+```
+SCAPY_ENABLE=0   # Modo simulacion (genera eventos sinteticos)
+SCAPY_ENABLE=1   # Modo captura real (requiere sudo + scapy + libpcap)
+```
+
+En modo simulacion, los eventos aparecen automaticamente en la seccion Reportes. Si aun asi no ve nada, verifique que el monitor se inicio correctamente desde la pagina principal o llamando a `http://localhost:5000/api/start`.
 
 ---
 
 ## Apéndice: Estructura de datos
 
-| Archivo | Propósito | Formato |
-|---|---|---|
+| Archivo               | Propósito                | Formato    |
+|-----------------------|--------------------------|------------|
 | `data/whitelist.json` | Dispositivos autorizados | JSON array |
-| `data/blacklist.json` | IPs/dominios maliciosos | JSON array |
-| `data/alerts.json` | Historial de alertas | JSON array |
-| `data/reports.json` | Eventos de red capturados | JSON array |
+| `data/blacklist.json` | IPs/dominios maliciosos  | JSON array |
+| `data/alerts.json`    | Historial de alertas     | JSON array |
+| `data/reports.json`   | Eventos de red capturados| JSON array |
 
 Los archivos JSON se crean automáticamente si no existen. Puede editarlos manualmente con cualquier editor de texto, pero se recomienda usar la interfaz web para whitelist para evitar errores de sintaxis.
 

@@ -1,6 +1,6 @@
 # IDS Seguridad
 
-IDS sencillo en Flask para registrar eventos de red, comparar contra listas blanca/negra y generar alertas.
+IDS en Flask para registrar eventos de red, comparar contra listas blanca/negra y generar alertas.
 
 ## Estructura
 
